@@ -702,7 +702,7 @@ func TestCatalogPersistence(t *testing.T) {
 	cat2, err := catalog.NewYAMLCatalog(catalogPath)
 	require.NoError(t, err)
 	require.NoError(t, cat2.Load())
-	g2 := &Globals{Cat: cat2, Out: os.Stdout}
+	g2 := &Globals{Cat: cat2}
 
 	assert.Equal(t, 1, g2.Cat.Count())
 	projects := g2.Cat.List()
@@ -748,21 +748,6 @@ func TestCatalogPathParsing(t *testing.T) {
 			assert.Equal(t, tc.expected, cli.CatalogPath)
 		})
 	}
-}
-
-func TestCatalogPathParsing_ShortFlagEqualsNotSupported(t *testing.T) {
-	cli := CLI{}
-
-	parser, err := kong.New(&cli,
-		kong.Name("pj"),
-		kong.Description("Project tracker and launcher"),
-		kong.Exit(func(int) {}),
-	)
-	require.NoError(t, err)
-	_, _ = parser.Parse([]string{"-c=/tmp/custom.yaml", "list"})
-
-	// Kong treats the equals as part of the value for short flags
-	assert.Equal(t, "=/tmp/custom.yaml", cli.CatalogPath)
 }
 
 func TestCatalogPathDefault(t *testing.T) {

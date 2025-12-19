@@ -207,34 +207,34 @@ func sortProjects(projects []Project, by SortField, descending bool) {
 	}
 
 	sort.Slice(projects, func(i, j int) bool {
-		var less bool
-		switch by {
-		case SortByName:
-			less = strings.ToLower(projects[i].Name) < strings.ToLower(projects[j].Name)
-		case SortByPath:
-			less = projects[i].Path < projects[j].Path
-		case SortByLastAccessed:
-			less = projects[i].LastAccessed.Before(projects[j].LastAccessed)
-		case SortByAddedAt:
-			less = projects[i].AddedAt.Before(projects[j].AddedAt)
-		case SortByTypes:
-			t1, t2 := "", ""
-			if len(projects[i].Types) > 0 {
-				t1 = string(projects[i].Types[0])
-			}
-			if len(projects[j].Types) > 0 {
-				t2 = string(projects[j].Types[0])
-			}
-			less = t1 < t2
-		default:
-			less = strings.ToLower(projects[i].Name) < strings.ToLower(projects[j].Name)
-		}
-
+		less := compareProjects(projects[i], projects[j], by)
 		if descending {
 			return !less
 		}
 		return less
 	})
+}
+
+func compareProjects(a, b Project, by SortField) bool {
+	switch by {
+	case SortByPath:
+		return a.Path < b.Path
+	case SortByLastAccessed:
+		return a.LastAccessed.Before(b.LastAccessed)
+	case SortByAddedAt:
+		return a.AddedAt.Before(b.AddedAt)
+	case SortByTypes:
+		t1, t2 := "", ""
+		if len(a.Types) > 0 {
+			t1 = string(a.Types[0])
+		}
+		if len(b.Types) > 0 {
+			t2 = string(b.Types[0])
+		}
+		return t1 < t2
+	default:
+		return strings.ToLower(a.Name) < strings.ToLower(b.Name)
+	}
 }
 
 func (c *YAMLCatalog) Count() int {
