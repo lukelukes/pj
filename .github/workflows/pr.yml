@@ -5,12 +5,9 @@ on:
     branches:
       - master
 
-# Minimal permissions - PRs from forks can't access secrets anyway,
-# but explicit read-only prevents accidental privilege escalation
 permissions:
   contents: read
 
-# Cancel in-progress runs for the same PR (saves CI minutes)
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
