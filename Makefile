@@ -13,7 +13,6 @@ LDFLAGS := -ldflags "-s -w -X main.Version=$(VERSION) -X main.Commit=$(COMMIT) -
 .PHONY: all build test test-integration test-all coverage clean install help
 .PHONY: mutation mutation-dry mutation-diff mutation-report
 .PHONY: release release-dry
-.PHONY: stats stats-quick
 
 all: build
 
@@ -68,6 +67,9 @@ mutation-report: | $(BUILD_DIR) ## Generate JSON mutation report
 		./internal
 
 ##@ Lint & QA
+install-hooks: ## Installs lefthook git hooks
+	lefthook install
+
 lint: ## Run golangci-lint per .golangci.yml
 	@golangci-lint run
 
@@ -105,6 +107,9 @@ release: ## Create a release (requires GITHUB_TOKEN)
 	goreleaser release --clean
 
 ##@ Utility
+init-env: ## Installs all mise managed tools
+	mise install
+
 help: ## Show this help (auto-generated)
 	@awk 'BEGIN {FS = ":.*##"; ORS="";} \
 		/^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0,5); next } \
