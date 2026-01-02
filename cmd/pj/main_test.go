@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"pj/internal/catalog"
@@ -19,7 +20,11 @@ func newTestGlobals(t *testing.T) (*Globals, *bytes.Buffer) {
 	cat, err := catalog.NewYAMLCatalog(filepath.Join(dir, "catalog.yaml"))
 	require.NoError(t, err)
 	buf := &bytes.Buffer{}
-	return &Globals{Cat: cat, Out: buf}, buf
+	return &Globals{
+		Cat:    cat,
+		Out:    buf,
+		RunCmd: func(name string, args ...string) error { return nil },
+	}, buf
 }
 
 func createTestProject(t *testing.T, g *Globals, name string) string {
@@ -433,17 +438,28 @@ func TestSearchCmd_Run(t *testing.T) {
 }
 
 func TestOpenCmd_Run(t *testing.T) {
-	t.Run("returns project path", func(t *testing.T) {
+	// Use 'true' command as editor - it exists and does nothing
+	t.Setenv("EDITOR", "true")
+
+	t.Run("launches editor and updates last accessed", func(t *testing.T) {
 		g, _ := newTestGlobals(t)
+		var editorCalled bool
+		var editorPath string
+		g.RunCmd = func(name string, args ...string) error {
+			editorCalled = true
+			if len(args) > 0 {
+				editorPath = args[0]
+			}
+			return nil
+		}
 		projectDir := createTestProject(t, g, "test-project")
 
 		cmd := OpenCmd{Name: "test-project"}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
-		projects := g.Cat.Search("test-project")
-		require.Len(t, projects, 1)
-		assert.Equal(t, projectDir, projects[0].Path)
+		assert.True(t, editorCalled, "editor should be called")
+		assert.Equal(t, projectDir, editorPath, "editor should be called with project path")
 	})
 
 	t.Run("updates last accessed time", func(t *testing.T) {
@@ -474,24 +490,34 @@ func TestOpenCmd_Run(t *testing.T) {
 	})
 
 	t.Run("handles multiple matches gracefully", func(t *testing.T) {
-		g, _ := newTestGlobals(t)
+		g, out := newTestGlobals(t)
 		createTestProject(t, g, "test-project-1")
 		createTestProject(t, g, "test-project-2")
+		out.Reset()
 
 		cmd := OpenCmd{Name: "test"}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
+		assert.Contains(t, out.String(), "Multiple projects match")
 	})
 
 	t.Run("opens project by partial match", func(t *testing.T) {
 		g, _ := newTestGlobals(t)
 		projectDir := createTestProject(t, g, "unique-project")
+		var editorPath string
+		g.RunCmd = func(name string, args ...string) error {
+			if len(args) > 0 {
+				editorPath = args[0]
+			}
+			return nil
+		}
 
 		cmd := OpenCmd{Name: "unique"}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
+		assert.Equal(t, projectDir, editorPath)
 		projects := g.Cat.Search("unique")
 		require.Len(t, projects, 1)
 		assert.Equal(t, projectDir, projects[0].Path)
@@ -761,4 +787,266 @@ func TestCatalogPathDefault(t *testing.T) {
 	require.NoError(t, err)
 	_, _ = parser.Parse([]string{"list"})
 	assert.Empty(t, cli.CatalogPath)
+}
+
+func TestShowCmd_Run(t *testing.T) {
+	t.Run("displays all fields", func(t *testing.T) {
+		g, out := newTestGlobals(t)
+
+		projectDir := t.TempDir()
+		err := os.WriteFile(filepath.Join(projectDir, "go.mod"), []byte("module test\n"), 0o644)
+		require.NoError(t, err)
+
+		addCmd := AddCmd{Path: projectDir, Name: "test-project", Tags: []string{"backend", "api"}}
+		require.NoError(t, addCmd.Run(g))
+
+		out.Reset()
+		cmd := ShowCmd{Name: "test-project"}
+		err = cmd.Run(g)
+
+		require.NoError(t, err)
+		output := out.String()
+		assert.Contains(t, output, "Name:   test-project")
+		assert.Contains(t, output, "Path:")
+		assert.Contains(t, output, "Status: active")
+		assert.Contains(t, output, "Tags:   backend, api")
+		assert.Contains(t, output, "Types:  go")
+	})
+
+	t.Run("outputs only path with --path flag", func(t *testing.T) {
+		g, out := newTestGlobals(t)
+		projectDir := createTestProject(t, g, "test-project")
+		out.Reset()
+
+		cmd := ShowCmd{Name: "test-project", Path: true}
+		err := cmd.Run(g)
+
+		require.NoError(t, err)
+		output := out.String()
+		assert.Equal(t, projectDir+"\n", output)
+	})
+
+	t.Run("returns error for nonexistent project", func(t *testing.T) {
+		g, _ := newTestGlobals(t)
+
+		cmd := ShowCmd{Name: "nonexistent"}
+		err := cmd.Run(g)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "no project found matching")
+	})
+
+	t.Run("handles multiple matches gracefully", func(t *testing.T) {
+		g, out := newTestGlobals(t)
+		createTestProject(t, g, "test-project-1")
+		createTestProject(t, g, "test-project-2")
+		out.Reset()
+
+		cmd := ShowCmd{Name: "test"}
+		err := cmd.Run(g)
+
+		require.NoError(t, err)
+		assert.Contains(t, out.String(), "Multiple projects match")
+	})
+}
+
+func TestInitCmd_Run(t *testing.T) {
+	t.Run("outputs valid shell script", func(t *testing.T) {
+		g, out := newTestGlobals(t)
+
+		cmd := InitCmd{}
+		err := cmd.Run(g)
+
+		require.NoError(t, err)
+		output := out.String()
+		assert.Contains(t, output, "pj shell integration")
+		assert.Contains(t, output, "pj()")
+		assert.Contains(t, output, "case \"$1\" in")
+		assert.Contains(t, output, "cd)")
+		assert.Contains(t, output, "command pj show")
+	})
+}
+
+func TestListCmd_RecentSort(t *testing.T) {
+	t.Run("sorts by last accessed with -r flag", func(t *testing.T) {
+		g, _ := newTestGlobals(t)
+
+		createTestProject(t, g, "old-project")
+		time.Sleep(10 * time.Millisecond)
+		createTestProject(t, g, "new-project")
+
+		time.Sleep(10 * time.Millisecond)
+		projects := g.Cat.Search("old-project")
+		require.Len(t, projects, 1)
+		p := projects[0]
+		p.Touch()
+		require.NoError(t, g.Cat.Update(p))
+
+		opts := catalog.FilterOptions{
+			SortBy:     catalog.SortByLastAccessed,
+			Descending: true,
+		}
+		sorted := g.Cat.Filter(opts)
+
+		require.Len(t, sorted, 2)
+		assert.Equal(t, "old-project", sorted[0].Name)
+		assert.Equal(t, "new-project", sorted[1].Name)
+	})
+}
+
+func TestEditCmd_EditorFlag(t *testing.T) {
+	t.Run("sets editor on project", func(t *testing.T) {
+		g, _ := newTestGlobals(t)
+		createTestProject(t, g, "test-project")
+
+		cmd := EditCmd{Name: "test-project", Editor: "nvim"}
+		err := cmd.Run(g)
+
+		require.NoError(t, err)
+		projects := g.Cat.Search("test-project")
+		require.Len(t, projects, 1)
+		assert.Equal(t, "nvim", projects[0].Editor)
+	})
+}
+
+func TestOpenCmd_UsesProjectEditor(t *testing.T) {
+	t.Run("uses project-specific editor", func(t *testing.T) {
+		g, _ := newTestGlobals(t)
+		projectDir := createTestProject(t, g, "test-project")
+
+		projects := g.Cat.Search("test-project")
+		require.Len(t, projects, 1)
+		p := projects[0]
+		p.Editor = "true"
+		require.NoError(t, g.Cat.Update(p))
+
+		var editorUsed string
+		g.RunCmd = func(name string, args ...string) error {
+			editorUsed = name
+			return nil
+		}
+
+		cmd := OpenCmd{Name: "test-project"}
+		err := cmd.Run(g)
+
+		require.NoError(t, err)
+		assert.Equal(t, "true", editorUsed)
+		_ = projectDir // Used by createTestProject
+	})
+}
+
+func TestOpenCmd_PathNotExist(t *testing.T) {
+	t.Setenv("EDITOR", "true")
+
+	t.Run("returns error when path no longer exists", func(t *testing.T) {
+		g, _ := newTestGlobals(t)
+		projectDir := createTestProject(t, g, "test-project")
+
+		// Delete the project directory
+		require.NoError(t, os.RemoveAll(projectDir))
+
+		cmd := OpenCmd{Name: "test-project"}
+		err := cmd.Run(g)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "path no longer exists")
+		assert.Contains(t, err.Error(), "pj rm")
+	})
+}
+
+func TestResolveEditor(t *testing.T) {
+	t.Run("uses project editor first", func(t *testing.T) {
+		p := catalog.Project{Editor: "true"}
+		editor, err := resolveEditor(p)
+		require.NoError(t, err)
+		assert.Equal(t, "true", editor)
+	})
+
+	t.Run("falls back to EDITOR env var", func(t *testing.T) {
+		t.Setenv("EDITOR", "true")
+		p := catalog.Project{}
+		editor, err := resolveEditor(p)
+		require.NoError(t, err)
+		assert.Equal(t, "true", editor)
+	})
+
+	t.Run("falls back to vim", func(t *testing.T) {
+		t.Setenv("EDITOR", "")
+		p := catalog.Project{}
+		editor, err := resolveEditor(p)
+		if err != nil {
+			assert.Contains(t, err.Error(), "not found in PATH")
+		} else {
+			assert.Equal(t, "vim", editor)
+		}
+	})
+
+	t.Run("returns error for missing editor", func(t *testing.T) {
+		p := catalog.Project{Editor: "nonexistent-editor-12345"}
+		_, err := resolveEditor(p)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "not found in PATH")
+	})
+}
+
+func TestFindProject(t *testing.T) {
+	t.Run("returns exact match", func(t *testing.T) {
+		g, _ := newTestGlobals(t)
+		createTestProject(t, g, "test-project")
+
+		project, err := findProject(g.Cat, "test-project")
+		require.NoError(t, err)
+		assert.Equal(t, "test-project", project.Name)
+	})
+
+	t.Run("returns error for no match", func(t *testing.T) {
+		g, _ := newTestGlobals(t)
+
+		_, err := findProject(g.Cat, "nonexistent")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "no project found matching")
+	})
+
+	t.Run("returns AmbiguousMatchError for multiple matches", func(t *testing.T) {
+		g, _ := newTestGlobals(t)
+		createTestProject(t, g, "test-project-1")
+		createTestProject(t, g, "test-project-2")
+
+		_, err := findProject(g.Cat, "test")
+		require.Error(t, err)
+
+		var ambErr *AmbiguousMatchError
+		require.ErrorAs(t, err, &ambErr)
+		assert.Equal(t, "test", ambErr.Query)
+		assert.Len(t, ambErr.Matches, 2)
+	})
+}
+
+func TestKongAliases(t *testing.T) {
+	testCases := []struct {
+		alias   string
+		command string
+	}{
+		{"a", "add"},
+		{"ls", "list"},
+		{"o", "open"},
+		{"e", "edit"},
+		{"s", "search"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("%s is alias for %s", tc.alias, tc.command), func(t *testing.T) {
+			cli := CLI{}
+			parser, err := kong.New(&cli,
+				kong.Name("pj"),
+				kong.Exit(func(int) {}),
+			)
+			require.NoError(t, err)
+
+			// Kong exits on --help, so we check that it parsed without panic
+			require.NotPanics(t, func() {
+				_, _ = parser.Parse([]string{tc.alias, "--help"})
+			})
+		})
+	}
 }

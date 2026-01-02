@@ -145,3 +145,69 @@ func TestDefaultProjectsDir(t *testing.T) {
 		assert.Equal(t, projectsLink, got)
 	})
 }
+
+func TestExpandPath(t *testing.T) {
+	cwd, err := os.Getwd()
+	require.NoError(t, err)
+
+	tests := []struct {
+		name     string
+		input    string
+		home     string
+		expected func(home, cwd string) string
+	}{
+		{
+			name:     "tilde expansion with subpath",
+			input:    "~/projects",
+			home:     "/home/test",
+			expected: func(home, _ string) string { return filepath.Join(home, "projects") },
+		},
+		{
+			name:     "tilde only",
+			input:    "~",
+			home:     "/home/test",
+			expected: func(home, _ string) string { return home },
+		},
+		{
+			name:     "dot expands to current dir",
+			input:    ".",
+			expected: func(_, cwd string) string { return cwd },
+		},
+		{
+			name:     "relative path becomes absolute",
+			input:    "subdir/project",
+			expected: func(_, cwd string) string { return filepath.Join(cwd, "subdir/project") },
+		},
+		{
+			name:     "absolute path unchanged",
+			input:    "/absolute/path",
+			expected: func(_, _ string) string { return "/absolute/path" },
+		},
+		{
+			name:     "tilde with spaces in path",
+			input:    "~/my projects/test",
+			home:     "/home/test",
+			expected: func(home, _ string) string { return filepath.Join(home, "my projects/test") },
+		},
+		{
+			name:     "tilde in middle not expanded",
+			input:    "foo/~/bar",
+			expected: func(_, cwd string) string { return filepath.Join(cwd, "foo/~/bar") },
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.home != "" {
+				t.Setenv("HOME", tt.home)
+			}
+
+			home, _ := os.UserHomeDir()
+
+			result, err := config.ExpandPath(tt.input)
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected(home, cwd), result)
+		})
+	}
+}

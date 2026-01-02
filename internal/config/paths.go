@@ -1,8 +1,10 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 func DefaultCatalogPath() string {
@@ -23,4 +25,22 @@ func DefaultProjectsDir() string {
 		}
 	}
 	return home
+}
+
+func ExpandPath(path string) (string, error) {
+	if strings.HasPrefix(path, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("cannot expand ~: %w", err)
+		}
+		path = filepath.Join(home, path[2:])
+	} else if path == "~" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("cannot expand ~: %w", err)
+		}
+		path = home
+	}
+
+	return filepath.Abs(path)
 }

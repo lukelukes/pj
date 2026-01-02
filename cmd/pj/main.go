@@ -1,9 +1,11 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"pj/internal/catalog"
 	"pj/internal/config"
@@ -14,23 +16,83 @@ import (
 )
 
 type Globals struct {
-	Cat catalog.Catalog
-	Out io.Writer
+	Cat    catalog.Catalog
+	Out    io.Writer
+	RunCmd func(name string, args ...string) error
+}
+
+func defaultRunCmd(name string, args ...string) error {
+	cmd := exec.Command(name, args...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+type AmbiguousMatchError struct {
+	Query   string
+	Matches []catalog.Project
+}
+
+func (e *AmbiguousMatchError) Error() string {
+	return fmt.Sprintf("multiple projects match %q", e.Query)
+}
+
+func (e *AmbiguousMatchError) WriteMatches(w io.Writer) {
+	fmt.Fprintln(w, "Multiple projects match. Please be more specific:")
+	for _, p := range e.Matches {
+		fmt.Fprintf(w, "  - %s (%s)\n", p.Name, p.Path)
+	}
+}
+
+func handleFindError(w io.Writer, err error) bool {
+	var ambErr *AmbiguousMatchError
+	if errors.As(err, &ambErr) {
+		ambErr.WriteMatches(w)
+		return true
+	}
+	return false
+}
+
+func findProject(cat catalog.Catalog, query string) (catalog.Project, error) {
+	projects := cat.Search(query)
+	if len(projects) == 0 {
+		return catalog.Project{}, fmt.Errorf("no project found matching: %s", query)
+	}
+	if len(projects) > 1 {
+		return catalog.Project{}, &AmbiguousMatchError{Query: query, Matches: projects}
+	}
+	return projects[0], nil
+}
+
+func resolveEditor(project catalog.Project) (string, error) {
+	editor := project.Editor
+	if editor == "" {
+		editor = os.Getenv("EDITOR")
+	}
+	if editor == "" {
+		editor = "vim"
+	}
+	if _, err := exec.LookPath(editor); err != nil {
+		return "", fmt.Errorf("editor %q not found in PATH", editor)
+	}
+	return editor, nil
 }
 
 type CLI struct {
-	Add    AddCmd    `cmd:"" help:"Add a project to the catalog"`
-	List   ListCmd   `cmd:"" help:"List projects in the catalog"`
+	Add    AddCmd    `cmd:"" aliases:"a" help:"Add a project to the catalog"`
+	List   ListCmd   `cmd:"" aliases:"ls" help:"List projects in the catalog"`
 	Rm     RmCmd     `cmd:"" help:"Remove a project from the catalog"`
-	Open   OpenCmd   `cmd:"" help:"Open a project (cd to directory)"`
-	Edit   EditCmd   `cmd:"" help:"Edit project metadata"`
-	Search SearchCmd `cmd:"" help:"Search for projects"`
+	Open   OpenCmd   `cmd:"" aliases:"o" help:"Open project in editor"`
+	Edit   EditCmd   `cmd:"" aliases:"e" help:"Edit project metadata"`
+	Search SearchCmd `cmd:"" aliases:"s" help:"Search for projects"`
+	Show   ShowCmd   `cmd:"" help:"Show project details"`
+	Init   InitCmd   `cmd:"" help:"Generate shell integration"`
 
 	CatalogPath string `name:"catalog" short:"c" help:"Path to catalog file"`
 }
 
 func (c *CLI) AfterApply(ctx *kong.Context) error {
-	// Determine catalog path
 	catalogPath := c.CatalogPath
 	if catalogPath == "" {
 		catalogPath = config.DefaultCatalogPath()
@@ -57,7 +119,7 @@ type AddCmd struct {
 
 func (cmd *AddCmd) Run(g *Globals) error {
 	cat := g.Cat
-	path, err := filepath.Abs(cmd.Path)
+	path, err := config.ExpandPath(cmd.Path)
 	if err != nil {
 		return fmt.Errorf("invalid path: %w", err)
 	}
@@ -98,6 +160,7 @@ type ListCmd struct {
 	Status string   `short:"s" help:"Filter by status (active, archived, abandoned)"`
 	Types  []string `short:"T" help:"Filter by project types (matches any)"`
 	Tags   []string `short:"t" help:"Filter by tags (all must match)"`
+	Recent bool     `short:"r" help:"Sort by last accessed (newest first)"`
 	JSON   bool     `help:"Output as JSON"`
 }
 
@@ -115,6 +178,10 @@ func (cmd *ListCmd) Run(g *Globals) error {
 	}
 	if len(cmd.Tags) > 0 {
 		opts.Tags = cmd.Tags
+	}
+	if cmd.Recent {
+		opts.SortBy = catalog.SortByLastAccessed
+		opts.Descending = true
 	}
 
 	projects := cat.Filter(opts)
@@ -150,65 +217,62 @@ type RmCmd struct {
 }
 
 func (cmd *RmCmd) Run(g *Globals) error {
-	cat := g.Cat
-	projects := cat.Search(cmd.Name)
-
-	if len(projects) == 0 {
-		return fmt.Errorf("no project found matching: %s", cmd.Name)
-	}
-
-	if len(projects) > 1 {
-		fmt.Fprintln(g.Out, "Multiple projects match. Please be more specific:")
-		for _, p := range projects {
-			fmt.Fprintf(g.Out, "  - %s (%s)\n", p.Name, p.Path)
+	project, err := findProject(g.Cat, cmd.Name)
+	if err != nil {
+		if handleFindError(g.Out, err) {
+			return nil
 		}
-		return nil
+		return err
 	}
 
-	p := projects[0]
-	if err := cat.Remove(p.ID); err != nil {
-		return fmt.Errorf("failed to remove project %q: %w", p.Name, err)
+	if err := g.Cat.Remove(project.ID); err != nil {
+		return fmt.Errorf("failed to remove project %q: %w", project.Name, err)
 	}
 
-	if err := cat.Save(); err != nil {
+	if err := g.Cat.Save(); err != nil {
 		return fmt.Errorf("failed to save catalog: %w", err)
 	}
 
-	fmt.Fprintf(g.Out, "Removed: %s\n", p.Name)
+	fmt.Fprintf(g.Out, "Removed: %s\n", project.Name)
 	return nil
 }
 
 type OpenCmd struct {
-	Name string `arg:"" help:"Project name to open"`
+	Name string `arg:"" help:"Project name or partial match"`
 }
 
 func (cmd *OpenCmd) Run(g *Globals) error {
-	cat := g.Cat
-	projects := cat.Search(cmd.Name)
-
-	if len(projects) == 0 {
-		return fmt.Errorf("no project found matching: %s", cmd.Name)
-	}
-
-	if len(projects) > 1 {
-		fmt.Fprintln(g.Out, "Multiple projects match. Please be more specific:")
-		for _, p := range projects {
-			fmt.Fprintf(g.Out, "  - %s (%s)\n", p.Name, p.Path)
+	project, err := findProject(g.Cat, cmd.Name)
+	if err != nil {
+		if handleFindError(g.Out, err) {
+			return nil
 		}
-		return nil
+		return err
 	}
 
-	p := projects[0]
-	p.Touch()
-	if err := cat.Update(p); err != nil {
-		return fmt.Errorf("failed to update project %q: %w", p.Name, err)
+	if _, err := os.Stat(project.Path); os.IsNotExist(err) {
+		return fmt.Errorf("project path no longer exists: %s\nRun 'pj rm %s' to remove from catalog",
+			project.Path, project.Name)
 	}
-	if err := cat.Save(); err != nil {
+
+	editor, err := resolveEditor(project)
+	if err != nil {
+		return err
+	}
+
+	project.Touch()
+	if err := g.Cat.Update(project); err != nil {
+		return fmt.Errorf("failed to update project %q: %w", project.Name, err)
+	}
+	if err := g.Cat.Save(); err != nil {
 		return fmt.Errorf("failed to save catalog: %w", err)
 	}
 
-	fmt.Fprintln(g.Out, p.Path)
-	return nil
+	runCmd := g.RunCmd
+	if runCmd == nil {
+		runCmd = defaultRunCmd
+	}
+	return runCmd(editor, project.Path)
 }
 
 type EditCmd struct {
@@ -217,25 +281,10 @@ type EditCmd struct {
 	AddTag []string `help:"Add tags"`
 	RmTag  []string `help:"Remove tags"`
 	Notes  string   `help:"Set notes"`
+	Editor string   `help:"Set editor command (e.g., code, nvim)"`
 }
 
-func (cmd *EditCmd) Run(g *Globals) error {
-	cat := g.Cat
-	projects := cat.Search(cmd.Name)
-
-	if len(projects) == 0 {
-		return fmt.Errorf("no project found matching: %s", cmd.Name)
-	}
-
-	if len(projects) > 1 {
-		fmt.Fprintln(g.Out, "Multiple projects match. Please be more specific:")
-		for _, p := range projects {
-			fmt.Fprintf(g.Out, "  - %s (%s)\n", p.Name, p.Path)
-		}
-		return nil
-	}
-
-	p := projects[0]
+func (cmd *EditCmd) applyEdits(p *catalog.Project) {
 	if cmd.Status != "" {
 		p.Status = catalog.Status(cmd.Status)
 	}
@@ -248,16 +297,31 @@ func (cmd *EditCmd) Run(g *Globals) error {
 	if cmd.Notes != "" {
 		p.Notes = cmd.Notes
 	}
+	if cmd.Editor != "" {
+		p.Editor = cmd.Editor
+	}
+}
 
-	if err := cat.Update(p); err != nil {
-		return fmt.Errorf("failed to update project %q: %w", p.Name, err)
+func (cmd *EditCmd) Run(g *Globals) error {
+	project, err := findProject(g.Cat, cmd.Name)
+	if err != nil {
+		if handleFindError(g.Out, err) {
+			return nil
+		}
+		return err
 	}
 
-	if err := cat.Save(); err != nil {
+	cmd.applyEdits(&project)
+
+	if err := g.Cat.Update(project); err != nil {
+		return fmt.Errorf("failed to update project %q: %w", project.Name, err)
+	}
+
+	if err := g.Cat.Save(); err != nil {
 		return fmt.Errorf("failed to save catalog: %w", err)
 	}
 
-	fmt.Fprintf(g.Out, "Updated: %s\n", p.Name)
+	fmt.Fprintf(g.Out, "Updated: %s\n", project.Name)
 	return nil
 }
 
@@ -279,6 +343,83 @@ func (cmd *SearchCmd) Run(g *Globals) error { //nolint:unparam // error required
 
 	return nil
 }
+
+type ShowCmd struct {
+	Name string `arg:"" help:"Project name"`
+	Path bool   `help:"Output only the path (for scripting)"`
+}
+
+func (cmd *ShowCmd) Run(g *Globals) error {
+	project, err := findProject(g.Cat, cmd.Name)
+	if err != nil {
+		if handleFindError(g.Out, err) {
+			return nil
+		}
+		return err
+	}
+
+	if cmd.Path {
+		fmt.Fprintln(g.Out, project.Path)
+		return nil
+	}
+
+	fmt.Fprintf(g.Out, "Name:   %s\n", project.Name)
+	fmt.Fprintf(g.Out, "Path:   %s\n", project.Path)
+	fmt.Fprintf(g.Out, "Status: %s\n", project.Status)
+	if project.Editor != "" {
+		fmt.Fprintf(g.Out, "Editor: %s\n", project.Editor)
+	}
+	if len(project.Tags) > 0 {
+		fmt.Fprintf(g.Out, "Tags:   %s\n", strings.Join(project.Tags, ", "))
+	}
+	if len(project.Types) > 0 {
+		types := make([]string, len(project.Types))
+		for i, t := range project.Types {
+			types[i] = string(t)
+		}
+		fmt.Fprintf(g.Out, "Types:  %s\n", strings.Join(types, ", "))
+	}
+	if project.Notes != "" {
+		fmt.Fprintf(g.Out, "Notes:  %s\n", project.Notes)
+	}
+	return nil
+}
+
+type InitCmd struct{}
+
+func (cmd *InitCmd) Run(g *Globals) error { //nolint:unparam // error required by kong interface
+	fmt.Fprint(g.Out, shellScript)
+	return nil
+}
+
+const shellScript = `# pj shell integration
+# Add to ~/.bashrc or ~/.zshrc: eval "$(pj init)"
+
+pj() {
+    case "$1" in
+        cd)
+            if [ -z "$2" ]; then
+                echo "Usage: pj cd <project>" >&2
+                return 1
+            fi
+            # Capture both stdout and exit code - propagate real errors
+            dir="$(command pj show "$2" --path 2>&1)"
+            if [ $? -ne 0 ]; then
+                echo "pj: $dir" >&2
+                return 1
+            fi
+            if [ ! -d "$dir" ]; then
+                echo "pj: path no longer exists: $dir" >&2
+                return 1
+            fi
+            builtin cd -- "$dir"
+            ;;
+        *)
+            command pj "$@"
+            ;;
+    esac
+}
+`
 
 func shortenPath(path string) string {
 	home, _ := os.UserHomeDir()

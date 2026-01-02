@@ -206,7 +206,7 @@ func sortProjects(projects []Project, by SortField, descending bool) {
 		by = SortByName
 	}
 
-	sort.Slice(projects, func(i, j int) bool {
+	sort.SliceStable(projects, func(i, j int) bool {
 		less := compareProjects(projects[i], projects[j], by)
 		if descending {
 			return !less
@@ -216,13 +216,17 @@ func sortProjects(projects []Project, by SortField, descending bool) {
 }
 
 func compareProjects(a, b Project, by SortField) bool {
+	var less, equal bool
+
 	switch by {
 	case SortByPath:
-		return a.Path < b.Path
+		less, equal = a.Path < b.Path, a.Path == b.Path
 	case SortByLastAccessed:
-		return a.LastAccessed.Before(b.LastAccessed)
+		less = a.LastAccessed.Before(b.LastAccessed)
+		equal = a.LastAccessed.Equal(b.LastAccessed)
 	case SortByAddedAt:
-		return a.AddedAt.Before(b.AddedAt)
+		less = a.AddedAt.Before(b.AddedAt)
+		equal = a.AddedAt.Equal(b.AddedAt)
 	case SortByTypes:
 		t1, t2 := "", ""
 		if len(a.Types) > 0 {
@@ -231,10 +235,17 @@ func compareProjects(a, b Project, by SortField) bool {
 		if len(b.Types) > 0 {
 			t2 = string(b.Types[0])
 		}
-		return t1 < t2
+		less, equal = t1 < t2, t1 == t2
 	default:
-		return strings.ToLower(a.Name) < strings.ToLower(b.Name)
+		n1, n2 := strings.ToLower(a.Name), strings.ToLower(b.Name)
+		less, equal = n1 < n2, n1 == n2
 	}
+
+	// Tiebreaker: use ID for deterministic ordering when primary key is equal
+	if equal {
+		return a.ID < b.ID
+	}
+	return less
 }
 
 func (c *YAMLCatalog) Count() int {
@@ -256,7 +267,7 @@ func (c *YAMLCatalog) Save() error {
 		file.Projects = append(file.Projects, p)
 	}
 
-	sort.Slice(file.Projects, func(i, j int) bool {
+	sort.SliceStable(file.Projects, func(i, j int) bool {
 		return file.Projects[i].Name < file.Projects[j].Name
 	})
 
