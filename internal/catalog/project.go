@@ -53,6 +53,7 @@ type Project struct {
 	LastAccessed time.Time     `yaml:"last_accessed"`
 	GitRemote    string        `yaml:"git_remote,omitempty"`
 	Description  string        `yaml:"description,omitempty"`
+	Editor       string        `yaml:"editor,omitempty"`
 }
 
 func NewProject(name, path string) Project {
@@ -62,6 +63,7 @@ func NewProject(name, path string) Project {
 		Name:         name,
 		Path:         path,
 		Types:        []ProjectType{},
+		Tags:         []string{},
 		Status:       StatusActive,
 		AddedAt:      now,
 		LastAccessed: now,
