@@ -10,7 +10,7 @@ COMMIT  := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 DATE    := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS := -ldflags "-s -w -X main.Version=$(VERSION) -X main.Commit=$(COMMIT) -X main.Date=$(DATE)"
 
-.PHONY: all build test test-integration test-all coverage clean install help
+.PHONY: all build test test-property test-property-deep test-integration test-all coverage clean install help
 .PHONY: mutation mutation-dry mutation-diff mutation-report
 .PHONY: release release-dry
 
@@ -27,11 +27,17 @@ build: | $(BUILD_DIR) ## Build the binary
 test: ## Run unit tests
 	go test -race ./internal/... ./cmd/...
 
+test-property: ## Run property-based tests (100 iterations)
+	go test -race ./proptest -run Property
+
+test-property-deep: ## Run property-based tests (10000 iterations, finds rare bugs)
+	go test -race ./proptest -run Property -rapid.checks=10000
+
 test-integration: ## Run integration tests
 	#go test -race ./tests/integration/...
 	echo "No integration tests yet"
 
-test-all: test test-integration
+test-all: test test-property test-integration
 
 coverage: | $(BUILD_DIR) ## Generate coverage report
 	go test -coverprofile=$(COVER_OUT) ./internal/...
@@ -96,7 +102,7 @@ verify-dev: build ## Run all quality checks - in local dev
 	@$(MAKE) test-all
 
 verify-ci: build ## Run all quality checks - in CI
-	@$(MAKE) -j4 vet vuln tidy
+	@$(MAKE) -j4 fmt-check vet vuln tidy
 	@$(MAKE) test-all
 
 ##@ Release
@@ -107,7 +113,7 @@ release: ## Create a release (requires GITHUB_TOKEN)
 	goreleaser release --clean
 
 ##@ Utility
-init-env: ## Installs all mise managed tools
+init-toolchain: ## Installs all mise managed tools
 	mise install
 
 help: ## Show this help (auto-generated)
