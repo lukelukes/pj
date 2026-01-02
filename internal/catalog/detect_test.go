@@ -12,14 +12,11 @@ import (
 
 func TestDetectProjectType(t *testing.T) {
 	tests := []struct {
-		name        string
-		files       map[string]string
-		dirs        []string
-		useNonExist bool
-		expected    []catalog.ProjectType
-		checkLen    bool
-		lenCheck    int
-		checkMsg    string
+		name     string
+		files    map[string]string
+		dirs     []string
+		path     func(t *testing.T) string
+		expected []catalog.ProjectType
 	}{
 		{
 			name:     "detects go project",
@@ -87,20 +84,19 @@ func TestDetectProjectType(t *testing.T) {
 				"package.json": "{}",
 			},
 			expected: []catalog.ProjectType{catalog.TypeGo, catalog.TypeNode},
-			checkLen: true,
-			lenCheck: 2,
 		},
 		{
-			name:        "handles non-existent directory",
-			useNonExist: true,
-			expected:    []catalog.ProjectType{catalog.TypeUnknown},
+			name: "handles non-existent directory",
+			path: func(t *testing.T) string {
+				return filepath.Join(t.TempDir(), "non-existent")
+			},
+			expected: []catalog.ProjectType{catalog.TypeUnknown},
 		},
 		{
 			name:     "specific type takes precedence over generic .git",
 			files:    map[string]string{"go.mod": "module test"},
 			dirs:     []string{".git"},
 			expected: []catalog.ProjectType{catalog.TypeGo},
-			checkMsg: "go.mod should result in TypeGo, not TypeGeneric from .git",
 		},
 		{
 			name: "deduplicates python when both markers exist",
@@ -118,15 +114,14 @@ func TestDetectProjectType(t *testing.T) {
 				"Cargo.toml": "[package]",
 			},
 			expected: []catalog.ProjectType{catalog.TypeRust},
-			checkMsg: "should detect Rust despite other files present",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var dir string
-			if tt.useNonExist {
-				dir = filepath.Join(t.TempDir(), "non-existent")
+			if tt.path != nil {
+				dir = tt.path(t)
 			} else {
 				dir = t.TempDir()
 
@@ -142,19 +137,42 @@ func TestDetectProjectType(t *testing.T) {
 			}
 
 			got := catalog.DetectProjectTypes(dir)
-
-			if tt.checkLen {
-				assert.Len(t, got, tt.lenCheck)
-				for _, expectedType := range tt.expected {
-					assert.Contains(t, got, expectedType)
-				}
-			} else {
-				if tt.checkMsg != "" {
-					assert.Equal(t, tt.expected, got, tt.checkMsg)
-				} else {
-					assert.Equal(t, tt.expected, got)
-				}
-			}
+			assert.ElementsMatch(t, tt.expected, got)
 		})
 	}
+}
+
+func TestDetectProjectTypes_Symlinks(t *testing.T) {
+	t.Run("handles symlinked project directory", func(t *testing.T) {
+		dir := t.TempDir()
+		realDir := filepath.Join(dir, "real")
+		require.NoError(t, os.Mkdir(realDir, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(realDir, "go.mod"), []byte("module x"), 0o644))
+
+		linkDir := filepath.Join(dir, "link")
+		require.NoError(t, os.Symlink(realDir, linkDir))
+
+		got := catalog.DetectProjectTypes(linkDir)
+		assert.Equal(t, []catalog.ProjectType{catalog.TypeGo}, got)
+	})
+
+	t.Run("handles symlinked marker file", func(t *testing.T) {
+		dir := t.TempDir()
+		realMod := filepath.Join(dir, "real-go.mod")
+		require.NoError(t, os.WriteFile(realMod, []byte("module x"), 0o644))
+		require.NoError(t, os.Symlink(realMod, filepath.Join(dir, "go.mod")))
+
+		got := catalog.DetectProjectTypes(dir)
+		assert.Equal(t, []catalog.ProjectType{catalog.TypeGo}, got)
+	})
+
+	t.Run("handles broken symlink gracefully", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.Symlink("/nonexistent/go.mod", filepath.Join(dir, "go.mod")))
+
+		assert.NotPanics(t, func() {
+			got := catalog.DetectProjectTypes(dir)
+			assert.Equal(t, []catalog.ProjectType{catalog.TypeUnknown}, got)
+		})
+	})
 }

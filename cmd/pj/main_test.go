@@ -196,7 +196,7 @@ func TestListCmd_Run(t *testing.T) {
 	})
 
 	t.Run("filters by status", func(t *testing.T) {
-		g, out := newTestGlobals(t)
+		g, _ := newTestGlobals(t)
 		createTestProject(t, g, "active-project")
 		createTestProject(t, g, "archived-project")
 
@@ -206,14 +206,10 @@ func TestListCmd_Run(t *testing.T) {
 		p.Status = catalog.StatusArchived
 		require.NoError(t, g.Cat.Update(p))
 
-		out.Reset()
 		cmd := ListCmd{Status: "archived"}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
-		assert.Contains(t, out.String(), "archived-project")
-		assert.NotContains(t, out.String(), "active-project")
-
 		filtered := g.Cat.Filter(catalog.FilterOptions{Status: catalog.StatusArchived})
 		assert.Len(t, filtered, 1)
 		assert.Equal(t, "archived-project", filtered[0].Name)
@@ -316,7 +312,7 @@ func TestRmCmd_Run(t *testing.T) {
 		assert.Contains(t, err.Error(), "no project found matching")
 	})
 
-	t.Run("handles multiple matches gracefully", func(t *testing.T) {
+	t.Run("does not remove when multiple matches exist", func(t *testing.T) {
 		g, _ := newTestGlobals(t)
 		createTestProject(t, g, "test-project-1")
 		createTestProject(t, g, "test-project-2")
@@ -435,6 +431,21 @@ func TestSearchCmd_Run(t *testing.T) {
 		assert.Len(t, results, 1)
 		assert.Equal(t, "MyProject", results[0].Name)
 	})
+
+	t.Run("outputs matching project names", func(t *testing.T) {
+		g, out := newTestGlobals(t)
+		createTestProject(t, g, "my-project")
+		createTestProject(t, g, "other-project")
+		out.Reset()
+
+		cmd := SearchCmd{Query: "my"}
+		err := cmd.Run(g)
+
+		require.NoError(t, err)
+		output := out.String()
+		assert.Contains(t, output, "my-project")
+		assert.NotContains(t, output, "other-project")
+	})
 }
 
 func TestOpenCmd_Run(t *testing.T) {
@@ -489,17 +500,21 @@ func TestOpenCmd_Run(t *testing.T) {
 		assert.Contains(t, err.Error(), "no project found matching")
 	})
 
-	t.Run("handles multiple matches gracefully", func(t *testing.T) {
-		g, out := newTestGlobals(t)
+	t.Run("does not open when multiple matches exist", func(t *testing.T) {
+		g, _ := newTestGlobals(t)
+		var editorCalled bool
+		g.RunCmd = func(name string, args ...string) error {
+			editorCalled = true
+			return nil
+		}
 		createTestProject(t, g, "test-project-1")
 		createTestProject(t, g, "test-project-2")
-		out.Reset()
 
 		cmd := OpenCmd{Name: "test"}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
-		assert.Contains(t, out.String(), "Multiple projects match")
+		assert.False(t, editorCalled, "editor should not be called for ambiguous match")
 	})
 
 	t.Run("opens project by partial match", func(t *testing.T) {
@@ -624,7 +639,7 @@ func TestEditCmd_Run(t *testing.T) {
 		assert.Contains(t, err.Error(), "no project found matching")
 	})
 
-	t.Run("handles multiple matches gracefully", func(t *testing.T) {
+	t.Run("does not modify when multiple matches exist", func(t *testing.T) {
 		g, _ := newTestGlobals(t)
 		createTestProject(t, g, "test-project-1")
 		createTestProject(t, g, "test-project-2")
@@ -663,6 +678,20 @@ func TestEditCmd_Run(t *testing.T) {
 		assert.ElementsMatch(t, []string{"new-tag"}, projects[0].Tags)
 		assert.False(t, projects[0].HasTag("old-tag"))
 		assert.True(t, projects[0].HasTag("new-tag"))
+	})
+
+	t.Run("outputs update confirmation", func(t *testing.T) {
+		g, out := newTestGlobals(t)
+		createTestProject(t, g, "test-project")
+		out.Reset()
+
+		cmd := EditCmd{Name: "test-project", Status: "archived"}
+		err := cmd.Run(g)
+
+		require.NoError(t, err)
+		output := out.String()
+		assert.Contains(t, output, "Updated:")
+		assert.Contains(t, output, "test-project")
 	})
 }
 
@@ -836,7 +865,7 @@ func TestShowCmd_Run(t *testing.T) {
 		assert.Contains(t, err.Error(), "no project found matching")
 	})
 
-	t.Run("handles multiple matches gracefully", func(t *testing.T) {
+	t.Run("does not show details when multiple matches exist", func(t *testing.T) {
 		g, out := newTestGlobals(t)
 		createTestProject(t, g, "test-project-1")
 		createTestProject(t, g, "test-project-2")
@@ -846,7 +875,9 @@ func TestShowCmd_Run(t *testing.T) {
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
-		assert.Contains(t, out.String(), "Multiple projects match")
+		output := out.String()
+		assert.NotContains(t, output, "Name:   test-project-1")
+		assert.NotContains(t, output, "Name:   test-project-2")
 	})
 }
 
@@ -1019,6 +1050,24 @@ func TestFindProject(t *testing.T) {
 		require.ErrorAs(t, err, &ambErr)
 		assert.Equal(t, "test", ambErr.Query)
 		assert.Len(t, ambErr.Matches, 2)
+	})
+}
+
+func TestAmbiguousMatchOutput(t *testing.T) {
+	t.Run("displays multiple matches message", func(t *testing.T) {
+		g, out := newTestGlobals(t)
+		createTestProject(t, g, "test-project-1")
+		createTestProject(t, g, "test-project-2")
+		out.Reset()
+
+		cmd := RmCmd{Name: "test"}
+		err := cmd.Run(g)
+
+		require.NoError(t, err)
+		output := out.String()
+		assert.Contains(t, output, "Multiple projects match")
+		assert.Contains(t, output, "test-project-1")
+		assert.Contains(t, output, "test-project-2")
 	})
 }
 

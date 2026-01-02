@@ -1,12 +1,16 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
+// DefaultCatalogPath returns the path to the catalog file.
+// It uses XDG_DATA_HOME if set, otherwise falls back to ~/.local/share.
+// When HOME is also unset, falls back to relative path ".local/share/pj/catalog.yaml".
 func DefaultCatalogPath() string {
 	dataHome := os.Getenv("XDG_DATA_HOME")
 	if dataHome == "" {
@@ -28,6 +32,14 @@ func DefaultProjectsDir() string {
 }
 
 func ExpandPath(path string) (string, error) {
+	if strings.TrimSpace(path) == "" {
+		return "", errors.New("path cannot be empty")
+	}
+
+	if strings.HasPrefix(path, "~") && !strings.HasPrefix(path, "~/") && path != "~" {
+		return "", fmt.Errorf("~username expansion is not supported: %s", path)
+	}
+
 	if strings.HasPrefix(path, "~/") {
 		home, err := os.UserHomeDir()
 		if err != nil {
