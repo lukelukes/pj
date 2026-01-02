@@ -85,8 +85,8 @@ lint-fix: ## Run golangci-lint with --fix (applies autofixes incl. formatters)
 fmt: ## Auto-fix formatting/imports
 	@golangci-lint fmt
 
-fmt-check: ## Check formatting/imports
-	@golangci-lint fmt
+fmt-check: ## Check formatting/imports (fails if unformatted)
+	@test -z "$$(golangci-lint fmt --diff)" || (echo "Run 'make fmt' to fix formatting" && exit 1)
 
 vet: ## Run go vet
 	@go vet ./...
@@ -102,7 +102,7 @@ verify-dev: build ## Run all quality checks - in local dev
 	@$(MAKE) test-all
 
 verify-ci: build ## Run all quality checks - in CI
-	@$(MAKE) -j4 fmt-check vet vuln tidy
+	@$(MAKE) -j4 vet vuln tidy
 	@$(MAKE) test-all
 
 ##@ Release
