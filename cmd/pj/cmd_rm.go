@@ -3,7 +3,7 @@ package main
 import "fmt"
 
 type RmCmd struct {
-	Name string `arg:"" help:"Project name or path to remove"`
+	Name string `arg:"" help:"Project name or path to remove" completion:"pj list 2>/dev/null | tail -n +3 | awk '{print $1}'"`
 }
 
 func (cmd *RmCmd) Run(g *Globals) error {

@@ -10,14 +10,15 @@ import (
 )
 
 type CLI struct {
-	Add    AddCmd    `cmd:"" aliases:"a" help:"Add a project to the catalog"`
-	List   ListCmd   `cmd:"" aliases:"ls" help:"List projects in the catalog"`
-	Rm     RmCmd     `cmd:"" help:"Remove a project from the catalog"`
-	Open   OpenCmd   `cmd:"" aliases:"o" help:"Open project in editor"`
-	Edit   EditCmd   `cmd:"" aliases:"e" help:"Edit project metadata"`
-	Search SearchCmd `cmd:"" aliases:"s" help:"Search for projects"`
-	Show   ShowCmd   `cmd:"" help:"Show project details"`
-	Init   InitCmd   `cmd:"" help:"Generate shell integration"`
+	Add        AddCmd        `cmd:"" aliases:"a" help:"Add a project to the catalog"`
+	List       ListCmd       `cmd:"" aliases:"ls" help:"List projects in the catalog"`
+	Rm         RmCmd         `cmd:"" help:"Remove a project from the catalog"`
+	Open       OpenCmd       `cmd:"" aliases:"o" help:"Open project in editor"`
+	Edit       EditCmd       `cmd:"" aliases:"e" help:"Edit project metadata"`
+	Search     SearchCmd     `cmd:"" aliases:"s" help:"Search for projects"`
+	Show       ShowCmd       `cmd:"" help:"Show project details"`
+	Init       InitCmd       `cmd:"" help:"Generate shell integration"`
+	Completion CompletionCmd `cmd:"" help:"Generate shell completions"`
 
 	CatalogPath string `name:"catalog" short:"c" help:"Path to catalog file"`
 }

@@ -6,7 +6,7 @@ import (
 )
 
 type EditCmd struct {
-	Name   string   `arg:"" help:"Project name to edit"`
+	Name   string   `arg:"" help:"Project name to edit" completion:"pj list 2>/dev/null | tail -n +3 | awk '{print $1}'"`
 	Status string   `short:"s" help:"Set status (active, archived, abandoned)"`
 	AddTag []string `help:"Add tags"`
 	RmTag  []string `help:"Remove tags"`
