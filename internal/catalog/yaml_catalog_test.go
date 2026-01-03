@@ -1,6 +1,7 @@
 package catalog_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"pj/internal/catalog"
@@ -482,7 +483,7 @@ func TestYAMLCatalog_ConcurrentAccess(t *testing.T) {
 		assert.Len(t, cat.List(), 3)
 	})
 
-	t.Run("handles mixed concurrent read and write operations safely", func(t *testing.T) {
+	t.Run("handles concurrent read operations safely", func(t *testing.T) {
 		cat := newTestYAMLCatalog(t)
 
 		p := catalog.NewProject("initial", newTestDir(t))
@@ -496,15 +497,12 @@ func TestYAMLCatalog_ConcurrentAccess(t *testing.T) {
 			go func(id int) {
 				defer wg.Done()
 
-				switch id % 5 {
-				case 0, 1, 2:
-
+				switch id % 3 {
+				case 0:
 					cat.Search("initial")
-				case 3:
-
+				case 1:
 					cat.Get(p.ID)
-				case 4:
-
+				case 2:
 					cat.List()
 				}
 			}(i)
@@ -515,6 +513,33 @@ func TestYAMLCatalog_ConcurrentAccess(t *testing.T) {
 		assert.GreaterOrEqual(t, cat.Count(), 1)
 		_, err := cat.Get(p.ID)
 		assert.NoError(t, err)
+	})
+
+	t.Run("handles concurrent add and remove safely", func(t *testing.T) {
+		cat := newTestYAMLCatalog(t)
+
+		const numGoroutines = 50
+		var wg sync.WaitGroup
+		wg.Add(numGoroutines)
+
+		for i := range numGoroutines {
+			go func(id int) {
+				defer wg.Done()
+				dir := newTestDir(t)
+				p := catalog.NewProject(fmt.Sprintf("project-%d", id), dir)
+
+				switch id % 3 {
+				case 0:
+					_ = cat.Add(p)
+				case 1:
+					cat.List()
+				case 2:
+					_ = cat.Remove(p.ID)
+				}
+			}(i)
+		}
+
+		wg.Wait()
 	})
 }
 

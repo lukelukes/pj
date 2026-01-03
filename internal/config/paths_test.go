@@ -12,53 +12,57 @@ import (
 )
 
 func TestDefaultCatalogPath(t *testing.T) {
-	t.Run("respects XDG_DATA_HOME when set", func(t *testing.T) {
-		t.Setenv("XDG_DATA_HOME", "/custom/data")
+	tests := []struct {
+		name        string
+		xdgDataHome *string
+		expected    string
+	}{
+		{
+			name:        "respects XDG_DATA_HOME when set",
+			xdgDataHome: ptr("/custom/data"),
+			expected:    "/custom/data/pj/catalog.yaml",
+		},
+		{
+			name:        "falls back to ~/.local/share when XDG_DATA_HOME is empty",
+			xdgDataHome: ptr(""),
+			expected:    "~/.local/share/pj/catalog.yaml",
+		},
+		{
+			name:        "falls back to ~/.local/share when XDG_DATA_HOME is not set",
+			xdgDataHome: nil,
+			expected:    "~/.local/share/pj/catalog.yaml",
+		},
+		{
+			name:        "handles XDG_DATA_HOME with trailing slash",
+			xdgDataHome: ptr("/custom/data/"),
+			expected:    "/custom/data/pj/catalog.yaml",
+		},
+		{
+			name:        "handles relative XDG_DATA_HOME path",
+			xdgDataHome: ptr("relative/path"),
+			expected:    "relative/path/pj/catalog.yaml",
+		},
+	}
 
-		got := config.DefaultCatalogPath()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.xdgDataHome != nil {
+				t.Setenv("XDG_DATA_HOME", *tt.xdgDataHome)
+			} else {
+				os.Unsetenv("XDG_DATA_HOME")
+			}
 
-		assert.Equal(t, "/custom/data/pj/catalog.yaml", got)
-	})
+			got := config.DefaultCatalogPath()
 
-	t.Run("falls back to ~/.local/share when XDG_DATA_HOME is empty", func(t *testing.T) {
-		t.Setenv("XDG_DATA_HOME", "")
+			expected := tt.expected
+			if home, err := os.UserHomeDir(); err == nil {
+				expected = expandTilde(expected, home)
+			}
+			assert.Equal(t, expected, got)
+		})
+	}
 
-		got := config.DefaultCatalogPath()
-
-		home, err := os.UserHomeDir()
-		require.NoError(t, err)
-		expected := filepath.Join(home, ".local", "share", "pj", "catalog.yaml")
-		assert.Equal(t, expected, got)
-	})
-
-	t.Run("falls back to ~/.local/share when XDG_DATA_HOME is not set", func(t *testing.T) {
-		os.Unsetenv("XDG_DATA_HOME")
-
-		got := config.DefaultCatalogPath()
-
-		home, err := os.UserHomeDir()
-		require.NoError(t, err)
-		expected := filepath.Join(home, ".local", "share", "pj", "catalog.yaml")
-		assert.Equal(t, expected, got)
-	})
-
-	t.Run("handles XDG_DATA_HOME with trailing slash", func(t *testing.T) {
-		t.Setenv("XDG_DATA_HOME", "/custom/data/")
-
-		got := config.DefaultCatalogPath()
-
-		assert.Equal(t, "/custom/data/pj/catalog.yaml", got)
-	})
-
-	t.Run("handles relative XDG_DATA_HOME path", func(t *testing.T) {
-		t.Setenv("XDG_DATA_HOME", "relative/path")
-
-		got := config.DefaultCatalogPath()
-
-		assert.Equal(t, "relative/path/pj/catalog.yaml", got)
-	})
-
-	t.Run("produces valid path even when HOME is unset", func(t *testing.T) {
+	t.Run("falls back to relative path when HOME is unset", func(t *testing.T) {
 		os.Unsetenv("HOME")
 		os.Unsetenv("XDG_DATA_HOME")
 		t.Cleanup(func() {
@@ -69,9 +73,19 @@ func TestDefaultCatalogPath(t *testing.T) {
 
 		got := config.DefaultCatalogPath()
 
-		assert.True(t, filepath.IsAbs(got) || got == ".local/share/pj/catalog.yaml",
-			"path should be absolute or have documented fallback, got: %s", got)
+		assert.Equal(t, ".local/share/pj/catalog.yaml", got)
 	})
+}
+
+func ptr(s string) *string {
+	return &s
+}
+
+func expandTilde(path, home string) string {
+	if len(path) >= 2 && path[:2] == "~/" {
+		return filepath.Join(home, path[2:])
+	}
+	return path
 }
 
 func TestDefaultProjectsDir(t *testing.T) {
@@ -208,6 +222,61 @@ func TestExpandPath(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected(home, cwd), result)
+		})
+	}
+}
+
+func TestExpandPath_EdgeCases(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:        "empty string",
+			input:       "",
+			wantErr:     true,
+			errContains: "path cannot be empty",
+		},
+		{
+			name:        "whitespace only",
+			input:       "   ",
+			wantErr:     true,
+			errContains: "path cannot be empty",
+		},
+		{
+			name:        "tabs and spaces",
+			input:       "\t  \t",
+			wantErr:     true,
+			errContains: "path cannot be empty",
+		},
+		{
+			name:        "tilde-user syntax",
+			input:       "~otheruser/path",
+			wantErr:     true,
+			errContains: "~username expansion is not supported",
+		},
+		{
+			name:        "tilde-user without path",
+			input:       "~otheruser",
+			wantErr:     true,
+			errContains: "~username expansion is not supported",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := config.ExpandPath(tt.input)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+				assert.Empty(t, result)
+			} else {
+				require.NoError(t, err)
+				assert.NotEmpty(t, result)
+			}
 		})
 	}
 }

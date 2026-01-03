@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"pj/internal/catalog"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -54,6 +55,26 @@ func TestProject_ValidateAndNormalize(t *testing.T) {
 
 		assert.ErrorIs(t, err, catalog.ErrPathNotExist)
 		assert.Contains(t, err.Error(), nonExistentPath)
+	})
+
+	t.Run("returns error for inaccessible path", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("permission test not reliable on Windows")
+		}
+
+		dir := t.TempDir()
+		restrictedDir := filepath.Join(dir, "restricted")
+		require.NoError(t, os.Mkdir(restrictedDir, 0o755))
+		childDir := filepath.Join(restrictedDir, "child")
+		require.NoError(t, os.Mkdir(childDir, 0o755))
+		require.NoError(t, os.Chmod(restrictedDir, 0o000))
+		t.Cleanup(func() { os.Chmod(restrictedDir, 0o755) })
+
+		p := catalog.NewProject("test", childDir)
+		err := p.ValidateAndNormalize()
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot access path")
 	})
 
 	t.Run("invalid status fails validation", func(t *testing.T) {
