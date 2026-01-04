@@ -1,6 +1,6 @@
 BUILD_DIR := out
 BINARY := $(BUILD_DIR)/pj
-PKG := ./cmd/pj
+PKG := ./cmd/cli
 COVER_OUT := $(BUILD_DIR)/coverage.out
 GOBIN := $(shell go env GOPATH)/bin
 
@@ -40,7 +40,7 @@ test-integration: ## Run integration tests
 test-all: test test-property test-integration
 
 coverage: | $(BUILD_DIR) ## Generate coverage report
-	go test -coverprofile=$(COVER_OUT) ./internal/...
+	go test -coverprofile=$(COVER_OUT) ./internal/... ./cmd/...
 	go tool cover -func=$(COVER_OUT)
 
 coverage-html: coverage ## Open coverage in browser
@@ -54,23 +54,20 @@ install: build ## Install to ~/.local/bin/
 
 ##@ Mutation Testing
 mutation: ## Run mutation testing on internal packages
-	$(GOBIN)/gremlins unleash \
+	gremlins unleash \
 		-E "_mock.*\.go$$" \
-		-E "test_helpers\.go$$" \
-		./internal
+		-E "test_helpers\.go$$"
 
 mutation-diff: ## Run mutation testing only on changed files
-	$(GOBIN)/gremlins unleash --diff "origin/master" \
+	gremlins unleash --diff "origin/master" \
 		--threshold-efficacy 80 \
-		--threshold-mcover 80 \
-		./internal/...
+		--threshold-mcover 80
 
 mutation-report: | $(BUILD_DIR) ## Generate JSON mutation report
-	$(GOBIN)/gremlins unleash \
+	gremlins unleash \
 		-E "_mock.*\.go$$" \
 		-E "test_helpers\.go$$" \
-		--output $(BUILD_DIR)/mutation-report.json \
-		./internal
+		--output $(BUILD_DIR)/mutation-report.json
 
 ##@ Lint & QA
 install-hooks: ## Installs lefthook git hooks
