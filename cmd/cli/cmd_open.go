@@ -6,7 +6,7 @@ import (
 )
 
 type OpenCmd struct {
-	Name string `arg:"" help:"Project name or partial match" completion:"pj list 2>/dev/null | tail -n +3 | awk '{print $1}'"`
+	Name string `arg:"" help:"Project name or partial match" completion:"pj list -n"`
 }
 
 func (cmd *OpenCmd) Run(g *Globals) error {

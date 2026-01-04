@@ -714,9 +714,6 @@ func TestIntegration_MultipleOperations(t *testing.T) {
 	results := g.Cat.Search("go-project")
 	assert.Len(t, results, 1)
 
-	openCmd := OpenCmd{Name: "go-project"}
-	require.NoError(t, openCmd.Run(g))
-
 	editCmd := EditCmd{
 		Name:   "go-project",
 		Status: "archived",

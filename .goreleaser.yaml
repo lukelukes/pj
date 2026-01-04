@@ -11,7 +11,7 @@ before:
 
 builds:
   - id: pj
-    main: ./cmd/pj
+    main: ./cmd/cli
     binary: pj
     env:
       - CGO_ENABLED=0

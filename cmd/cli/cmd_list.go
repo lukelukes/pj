@@ -13,6 +13,7 @@ type ListCmd struct {
 	Tags   []string `short:"t" help:"Filter by tags (all must match)"`
 	Recent bool     `short:"r" help:"Sort by last accessed (newest first)"`
 	JSON   bool     `help:"Output as JSON"`
+	Names  bool     `short:"n" help:"Output only project names (one per line)"`
 }
 
 func (cmd *ListCmd) Run(g *Globals) error {
@@ -37,11 +38,22 @@ func (cmd *ListCmd) Run(g *Globals) error {
 
 	projects := cat.Filter(opts)
 
+	if cmd.Names {
+		for _, p := range projects {
+			fmt.Fprintln(g.Out, p.Name)
+		}
+		return nil
+	}
+
 	if len(projects) == 0 {
 		fmt.Fprintln(g.Out, "No projects found.")
 		return nil
 	}
 
+	return cmd.printProjects(g, projects)
+}
+
+func (cmd *ListCmd) printProjects(g *Globals, projects []catalog.Project) error {
 	w := tabwriter.NewWriter(g.Out, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "NAME\tPATH\tTYPES\tSTATUS\tTAGS")
 	fmt.Fprintln(w, "----\t----\t-----\t------\t----")
