@@ -17,6 +17,7 @@ type CLI struct {
 	Edit       EditCmd       `cmd:"" aliases:"e" help:"Edit project metadata"`
 	Search     SearchCmd     `cmd:"" aliases:"s" help:"Search for projects"`
 	Show       ShowCmd       `cmd:"" help:"Show project details"`
+	Cd         CdCmd         `cmd:"" help:"Change directory to project (requires shell integration)"`
 	Init       InitCmd       `cmd:"" help:"Generate shell integration"`
 	Completion CompletionCmd `cmd:"" help:"Generate shell completions"`
 
