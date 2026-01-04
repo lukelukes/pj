@@ -6,7 +6,7 @@ import (
 )
 
 type ShowCmd struct {
-	Name string `arg:"" help:"Project name" completion:"pj list 2>/dev/null | tail -n +3 | awk '{print $1}'"`
+	Name string `arg:"" help:"Project name" completion:"pj list -n"`
 	Path bool   `help:"Output only the path (for scripting)"`
 }
 
