@@ -195,73 +195,6 @@ func TestListCmd_Run(t *testing.T) {
 		assert.Equal(t, 2, g.Cat.Count())
 	})
 
-	t.Run("filters by status", func(t *testing.T) {
-		g, _ := newTestGlobals(t)
-		createTestProject(t, g, "active-project")
-		createTestProject(t, g, "archived-project")
-
-		projects := g.Cat.Search("archived-project")
-		require.Len(t, projects, 1)
-		p := projects[0]
-		p.Status = catalog.StatusArchived
-		require.NoError(t, g.Cat.Update(p))
-
-		cmd := ListCmd{Status: "archived"}
-		err := cmd.Run(g)
-
-		require.NoError(t, err)
-		filtered := g.Cat.Filter(catalog.FilterOptions{Status: catalog.StatusArchived})
-		assert.Len(t, filtered, 1)
-		assert.Equal(t, "archived-project", filtered[0].Name)
-		assert.Equal(t, 2, g.Cat.Count())
-	})
-
-	t.Run("filters by type", func(t *testing.T) {
-		g, _ := newTestGlobals(t)
-
-		goDir := t.TempDir()
-		err := os.WriteFile(filepath.Join(goDir, "go.mod"), []byte("module test\n"), 0o644)
-		require.NoError(t, err)
-		cmd1 := AddCmd{Path: goDir, Name: "go-project"}
-		require.NoError(t, cmd1.Run(g))
-
-		nodeDir := t.TempDir()
-		err = os.WriteFile(filepath.Join(nodeDir, "package.json"), []byte("{}"), 0o644)
-		require.NoError(t, err)
-		cmd2 := AddCmd{Path: nodeDir, Name: "node-project"}
-		require.NoError(t, cmd2.Run(g))
-
-		cmd := ListCmd{Types: []string{"go"}}
-		err = cmd.Run(g)
-
-		require.NoError(t, err)
-		filtered := g.Cat.Filter(catalog.FilterOptions{Types: []catalog.ProjectType{catalog.TypeGo}})
-		assert.Len(t, filtered, 1)
-		assert.Equal(t, "go-project", filtered[0].Name)
-	})
-
-	t.Run("filters by tags", func(t *testing.T) {
-		g, _ := newTestGlobals(t)
-
-		projectDir := t.TempDir()
-		cmd1 := AddCmd{
-			Path: projectDir,
-			Name: "tagged-project",
-			Tags: []string{"backend", "api"},
-		}
-		require.NoError(t, cmd1.Run(g))
-
-		createTestProject(t, g, "untagged-project")
-
-		cmd := ListCmd{Tags: []string{"backend"}}
-		err := cmd.Run(g)
-
-		require.NoError(t, err)
-		filtered := g.Cat.Filter(catalog.FilterOptions{Tags: []string{"backend"}})
-		assert.Len(t, filtered, 1)
-		assert.Equal(t, "tagged-project", filtered[0].Name)
-	})
-
 	t.Run("output includes header and project data", func(t *testing.T) {
 		g, out := newTestGlobals(t)
 		createTestProject(t, g, "my-project")
@@ -352,99 +285,6 @@ func TestRmCmd_Run(t *testing.T) {
 		output := out.String()
 		assert.Contains(t, output, "Removed:")
 		assert.Contains(t, output, "doomed-project")
-	})
-}
-
-func TestSearchCmd_Run(t *testing.T) {
-	t.Run("finds matching projects by name", func(t *testing.T) {
-		g, _ := newTestGlobals(t)
-		createTestProject(t, g, "my-project")
-		createTestProject(t, g, "other-project")
-
-		cmd := SearchCmd{Query: "my"}
-		err := cmd.Run(g)
-
-		require.NoError(t, err)
-		results := g.Cat.Search("my")
-		assert.Len(t, results, 1)
-		assert.Equal(t, "my-project", results[0].Name)
-	})
-
-	t.Run("finds matching projects by path", func(t *testing.T) {
-		g, _ := newTestGlobals(t)
-
-		tmpDir := t.TempDir()
-		cmd1 := AddCmd{Path: tmpDir, Name: "path-test"}
-		require.NoError(t, cmd1.Run(g))
-
-		cmd := SearchCmd{Query: filepath.Base(tmpDir)}
-		err := cmd.Run(g)
-
-		require.NoError(t, err)
-		results := g.Cat.Search(filepath.Base(tmpDir))
-		assert.Len(t, results, 1)
-	})
-
-	t.Run("finds matching projects by tag", func(t *testing.T) {
-		g, _ := newTestGlobals(t)
-
-		projectDir := t.TempDir()
-		cmd1 := AddCmd{
-			Path: projectDir,
-			Name: "tagged-project",
-			Tags: []string{"backend", "api"},
-		}
-		require.NoError(t, cmd1.Run(g))
-
-		createTestProject(t, g, "untagged-project")
-
-		cmd := SearchCmd{Query: "backend"}
-		err := cmd.Run(g)
-
-		require.NoError(t, err)
-		results := g.Cat.Search("backend")
-		assert.Len(t, results, 1)
-		assert.Equal(t, "tagged-project", results[0].Name)
-	})
-
-	t.Run("returns no results for no matches", func(t *testing.T) {
-		g, _ := newTestGlobals(t)
-		createTestProject(t, g, "test-project")
-
-		cmd := SearchCmd{Query: "nonexistent"}
-		err := cmd.Run(g)
-
-		require.NoError(t, err)
-		results := g.Cat.Search("nonexistent")
-		assert.Empty(t, results)
-	})
-
-	t.Run("searches are case insensitive", func(t *testing.T) {
-		g, _ := newTestGlobals(t)
-		createTestProject(t, g, "MyProject")
-
-		cmd := SearchCmd{Query: "myproject"}
-		err := cmd.Run(g)
-
-		require.NoError(t, err)
-		results := g.Cat.Search("myproject")
-		assert.Len(t, results, 1)
-		assert.Equal(t, "MyProject", results[0].Name)
-	})
-
-	t.Run("outputs matching project names", func(t *testing.T) {
-		g, out := newTestGlobals(t)
-		createTestProject(t, g, "my-project")
-		createTestProject(t, g, "other-project")
-		out.Reset()
-
-		cmd := SearchCmd{Query: "my"}
-		err := cmd.Run(g)
-
-		require.NoError(t, err)
-		output := out.String()
-		assert.Contains(t, output, "my-project")
-		assert.NotContains(t, output, "other-project")
 	})
 }
 
@@ -895,33 +735,6 @@ func TestInitCmd_Run(t *testing.T) {
 	})
 }
 
-func TestListCmd_RecentSort(t *testing.T) {
-	t.Run("sorts by last accessed with -r flag", func(t *testing.T) {
-		g, _ := newTestGlobals(t)
-
-		createTestProject(t, g, "old-project")
-		time.Sleep(10 * time.Millisecond)
-		createTestProject(t, g, "new-project")
-
-		time.Sleep(10 * time.Millisecond)
-		projects := g.Cat.Search("old-project")
-		require.Len(t, projects, 1)
-		p := projects[0]
-		p.Touch()
-		require.NoError(t, g.Cat.Update(p))
-
-		opts := catalog.FilterOptions{
-			SortBy:     catalog.SortByLastAccessed,
-			Descending: true,
-		}
-		sorted := g.Cat.Filter(opts)
-
-		require.Len(t, sorted, 2)
-		assert.Equal(t, "old-project", sorted[0].Name)
-		assert.Equal(t, "new-project", sorted[1].Name)
-	})
-}
-
 func TestEditCmd_EditorFlag(t *testing.T) {
 	t.Run("sets editor on project", func(t *testing.T) {
 		g, _ := newTestGlobals(t)
@@ -1077,7 +890,6 @@ func TestKongAliases(t *testing.T) {
 		{"ls", "list"},
 		{"o", "open"},
 		{"e", "edit"},
-		{"s", "search"},
 	}
 
 	for _, tc := range testCases {

@@ -8,35 +8,11 @@ import (
 )
 
 type ListCmd struct {
-	Status string   `short:"s" help:"Filter by status (active, archived, abandoned)"`
-	Types  []string `short:"T" help:"Filter by project types (matches any)"`
-	Tags   []string `short:"t" help:"Filter by tags (all must match)"`
-	Recent bool     `short:"r" help:"Sort by last accessed (newest first)"`
-	JSON   bool     `help:"Output as JSON"`
-	Names  bool     `short:"n" help:"Output only project names (one per line)"`
+	Names bool `short:"n" help:"Output only project names (one per line)"`
 }
 
 func (cmd *ListCmd) Run(g *Globals) error {
-	cat := g.Cat
-	opts := catalog.FilterOptions{}
-
-	if cmd.Status != "" {
-		opts.Status = catalog.Status(cmd.Status)
-	}
-	if len(cmd.Types) > 0 {
-		for _, t := range cmd.Types {
-			opts.Types = append(opts.Types, catalog.ProjectType(t))
-		}
-	}
-	if len(cmd.Tags) > 0 {
-		opts.Tags = cmd.Tags
-	}
-	if cmd.Recent {
-		opts.SortBy = catalog.SortByLastAccessed
-		opts.Descending = true
-	}
-
-	projects := cat.Filter(opts)
+	projects := g.Cat.List()
 
 	if cmd.Names {
 		for _, p := range projects {

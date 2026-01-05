@@ -15,7 +15,6 @@ type CLI struct {
 	Rm         RmCmd         `cmd:"" help:"Remove a project from the catalog"`
 	Open       OpenCmd       `cmd:"" aliases:"o" help:"Open project in editor"`
 	Edit       EditCmd       `cmd:"" aliases:"e" help:"Edit project metadata"`
-	Search     SearchCmd     `cmd:"" aliases:"s" help:"Search for projects"`
 	Show       ShowCmd       `cmd:"" help:"Show project details"`
 	Cd         CdCmd         `cmd:"" help:"Change directory to project (requires shell integration)"`
 	Init       InitCmd       `cmd:"" help:"Generate shell integration"`
