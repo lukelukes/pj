@@ -48,6 +48,7 @@ coverage-html: coverage ## Open coverage in browser
 
 clean: ## Remove build artifacts
 	rm -rf $(BUILD_DIR)
+	go clean -cache
 
 install: build ## Install to ~/.local/bin/
 	cp $(BINARY) ~/.local/bin/
