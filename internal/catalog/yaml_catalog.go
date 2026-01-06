@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -156,11 +155,6 @@ func matchesQuery(p Project, query string) bool {
 	if strings.Contains(strings.ToLower(p.Path), query) {
 		return true
 	}
-	for _, tag := range p.Tags {
-		if strings.Contains(strings.ToLower(tag), query) {
-			return true
-		}
-	}
 	return false
 }
 
@@ -180,24 +174,9 @@ func (c *YAMLCatalog) Filter(opts FilterOptions) []Project {
 }
 
 func matchesFilter(p Project, opts FilterOptions) bool {
-	if opts.Status != "" && p.Status != opts.Status {
-		return false
-	}
-
-	if len(opts.Types) > 0 && !slices.ContainsFunc(opts.Types, p.HasType) {
-		return false
-	}
-
-	for _, tag := range opts.Tags {
-		if !p.HasTag(tag) {
-			return false
-		}
-	}
-
 	if opts.Query != "" && !matchesQuery(p, strings.ToLower(opts.Query)) {
 		return false
 	}
-
 	return true
 }
 
@@ -227,21 +206,11 @@ func compareProjects(a, b Project, by SortField) bool {
 	case SortByAddedAt:
 		less = a.AddedAt.Before(b.AddedAt)
 		equal = a.AddedAt.Equal(b.AddedAt)
-	case SortByTypes:
-		t1, t2 := "", ""
-		if len(a.Types) > 0 {
-			t1 = string(a.Types[0])
-		}
-		if len(b.Types) > 0 {
-			t2 = string(b.Types[0])
-		}
-		less, equal = t1 < t2, t1 == t2
 	default:
 		n1, n2 := strings.ToLower(a.Name), strings.ToLower(b.Name)
 		less, equal = n1 < n2, n1 == n2
 	}
 
-	// Tiebreaker: use ID for deterministic ordering when primary key is equal
 	if equal {
 		return a.ID < b.ID
 	}

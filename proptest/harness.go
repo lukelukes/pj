@@ -15,12 +15,6 @@ const (
 	typicalMinProjects   = 1
 	typicalMaxProjects   = 10
 	transitivityMinCount = 3
-	minTypes             = 0
-	maxTypes             = 3
-	minTags              = 0
-	maxTags              = 5
-	filterMinSlice       = 1
-	filterMaxSlice       = 3
 	minUnrelatedProjects = 1
 	maxUnrelatedProjects = 5
 )
@@ -28,28 +22,12 @@ const (
 type ProjectGenOpt func(*projectGenConfig)
 
 type projectGenConfig struct {
-	name   *string
-	status *catalog.Status
-	types  []catalog.ProjectType
-	tags   []string
-	notes  *string
+	name *string
 }
 
 func WithName(name string) ProjectGenOpt {
 	return func(c *projectGenConfig) {
 		c.name = &name
-	}
-}
-
-func WithStatus(status catalog.Status) ProjectGenOpt {
-	return func(c *projectGenConfig) {
-		c.status = &status
-	}
-}
-
-func WithTypes(types ...catalog.ProjectType) ProjectGenOpt {
-	return func(c *projectGenConfig) {
-		c.types = types
 	}
 }
 
@@ -74,50 +52,6 @@ func GenProject(t *rapid.T, dir string, opts ...ProjectGenOpt) catalog.Project {
 
 	p := catalog.NewProject(name, path)
 
-	if cfg.types != nil {
-		p = p.WithTypes(cfg.types...)
-	} else {
-		p = generateTypes(t, p)
-	}
-
-	if cfg.tags != nil {
-		p = p.WithTags(cfg.tags...)
-	} else {
-		p = generateTags(t, p)
-	}
-
-	if cfg.status != nil {
-		p = p.WithStatus(*cfg.status)
-	} else {
-		p = p.WithStatus(statusGen().Draw(t, "status"))
-	}
-
-	if cfg.notes != nil {
-		p = p.WithNotes(*cfg.notes)
-	} else if rapid.Bool().Draw(t, "hasNotes") {
-		p = p.WithNotes(notesGen.Draw(t, "notes"))
-	}
-
-	return p
-}
-
-func generateTypes(t *rapid.T, p catalog.Project) catalog.Project {
-	numTypes := rapid.IntRange(minTypes, maxTypes).Draw(t, "numTypes")
-	types := make([]catalog.ProjectType, numTypes)
-	for i := range numTypes {
-		types[i] = projectTypeGen().Draw(t, "type")
-	}
-	p = p.WithTypes(types...)
-	return p
-}
-
-func generateTags(t *rapid.T, p catalog.Project) catalog.Project {
-	numTags := rapid.IntRange(minTags, maxTags).Draw(t, "numTags")
-	tags := make([]string, numTags)
-	for i := range numTags {
-		tags[i] = tagGen().Draw(t, "tag")
-	}
-	p = p.WithTags(tags...)
 	return p
 }
 

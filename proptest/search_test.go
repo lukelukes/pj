@@ -79,26 +79,6 @@ func TestProperty_Search_UnrelatedProjectsNoEffect(t *testing.T) {
 	})
 }
 
-func TestProperty_Filter_ByStatusAndType(t *testing.T) {
-	RunWithCatalog(t, func(h *CatalogHarness) {
-		h.MustAddProject(WithName("active-go"), WithStatus(catalog.StatusActive), WithTypes(catalog.TypeGo))
-		h.MustAddProject(WithName("archived-go"), WithStatus(catalog.StatusArchived), WithTypes(catalog.TypeGo))
-		h.MustAddProject(WithName("active-rust"), WithStatus(catalog.StatusActive), WithTypes(catalog.TypeRust))
-
-		filtered := h.Catalog.Filter(catalog.FilterOptions{
-			Status: catalog.StatusActive,
-			Types:  []catalog.ProjectType{catalog.TypeGo},
-		})
-
-		if len(filtered) != 1 {
-			h.T.Fatalf("expected 1 project, got %d", len(filtered))
-		}
-		if filtered[0].Name != "active-go" {
-			h.T.Fatalf("expected active-go, got %s", filtered[0].Name)
-		}
-	})
-}
-
 func TestProperty_Sort_Transitivity(t *testing.T) {
 	RunWithCatalog(t, func(h *CatalogHarness) {
 		h.AddProjects(transitivityMinCount, typicalMaxProjects)

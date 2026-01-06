@@ -7,67 +7,28 @@ import (
 	"pgregory.net/rapid"
 )
 
-var allProjectTypes = []catalog.ProjectType{
-	catalog.TypeUnknown, catalog.TypeGo, catalog.TypeRust, catalog.TypeNode, catalog.TypePython,
-	catalog.TypeElixir, catalog.TypeRuby, catalog.TypeJava, catalog.TypeGeneric,
-}
-
-var allStatuses = []catalog.Status{catalog.StatusActive, catalog.StatusArchived, catalog.StatusAbandoned}
-
 var (
 	pathSegmentGen = rapid.StringMatching(`[a-z]{5,10}`)
 	iterDirGen     = rapid.StringMatching(`[a-z]{8}`)
 	subdirGen      = rapid.StringMatching(`[a-z]{6}`)
 	shortQueryGen  = rapid.StringMatching(`[a-z]{1,5}`)
 	queryGen       = rapid.StringMatching(`[a-z]{1,10}`)
-	notesGen       = rapid.StringMatching(`[a-zA-Z0-9 _.,-]{0,50}`)
-	numSuffixGen   = rapid.StringMatching(`[0-9]{10}`)
 )
 
 func validNameGen() *rapid.Generator[string] {
 	return rapid.StringMatching(`[a-zA-Z][a-zA-Z0-9_-]{0,30}`)
 }
 
-func tagGen() *rapid.Generator[string] {
-	return rapid.StringMatching(`[a-z][a-z0-9-]{0,15}`)
-}
-
-func statusGen() *rapid.Generator[catalog.Status] {
-	return rapid.SampledFrom(allStatuses)
-}
-
-func projectTypeGen() *rapid.Generator[catalog.ProjectType] {
-	return rapid.SampledFrom(allProjectTypes)
-}
-
 func filterOptionsGen() *rapid.Generator[catalog.FilterOptions] {
 	return rapid.Custom(func(t *rapid.T) catalog.FilterOptions {
-		var status catalog.Status
-		if rapid.Bool().Draw(t, "hasStatus") {
-			status = statusGen().Draw(t, "status")
-		}
-
-		var types []catalog.ProjectType
-		if rapid.Bool().Draw(t, "hasTypes") {
-			types = rapid.SliceOfN(projectTypeGen(), filterMinSlice, filterMaxSlice).Draw(t, "types")
-		}
-
-		var tags []string
-		if rapid.Bool().Draw(t, "hasTags") {
-			tags = rapid.SliceOfN(tagGen(), filterMinSlice, filterMaxSlice).Draw(t, "tags")
-		}
-
 		var query string
 		if rapid.Bool().Draw(t, "hasQuery") {
 			query = queryGen.Draw(t, "query")
 		}
 
-		sortFields := []catalog.SortField{"", catalog.SortByName, catalog.SortByPath, catalog.SortByLastAccessed, catalog.SortByAddedAt, catalog.SortByTypes}
+		sortFields := []catalog.SortField{"", catalog.SortByName, catalog.SortByPath, catalog.SortByLastAccessed, catalog.SortByAddedAt}
 
 		return catalog.FilterOptions{
-			Status:     status,
-			Types:      types,
-			Tags:       tags,
 			Query:      query,
 			SortBy:     rapid.SampledFrom(sortFields).Draw(t, "sortBy"),
 			Descending: rapid.Bool().Draw(t, "desc"),
@@ -134,7 +95,6 @@ projects:
   - id: test-id
     name: test-project
     path: /tmp/test
-    status: active
     %s: %s
     added_at: 2024-01-01T00:00:00Z
     last_accessed: 2024-01-01T00:00:00Z
@@ -144,26 +104,6 @@ projects:
 
 func invalidTypesGen() *rapid.Generator[string] {
 	return rapid.OneOf(
-		rapid.Just(`version: 1
-projects:
-  - id: test-id
-    name: test-project
-    path: /tmp/test
-    status: invalid_status_value
-    added_at: 2024-01-01T00:00:00Z
-    last_accessed: 2024-01-01T00:00:00Z
-`),
-		rapid.Just(`version: 1
-projects:
-  - id: test-id
-    name: test-project
-    path: /tmp/test
-    status: active
-    types:
-      - invalid_type_value
-    added_at: 2024-01-01T00:00:00Z
-    last_accessed: 2024-01-01T00:00:00Z
-`),
 		rapid.Just(`version: "not_a_number"
 projects: []
 `),
@@ -172,56 +112,19 @@ projects:
   - id: 12345
     name: test-project
     path: /tmp/test
-    status: active
 `),
 		rapid.Just(`version: 1
 projects:
   - id: test-id
     name: [not, a, string]
     path: /tmp/test
-    status: active
 `),
 		rapid.Just(`version: 1
 projects:
   - id: test-id
     name: test-project
     path: /tmp/test
-    status: active
-    tags: "not-a-list"
-`),
-		rapid.Just(`version: 1
-projects:
-  - id: test-id
-    name: test-project
-    path: /tmp/test
-    status: active
     added_at: "not-a-date"
 `),
-		rapid.Custom(func(t *rapid.T) string {
-			invalidStatus := rapid.StringMatching(`[a-z]{5,15}`).Draw(t, "invalidStatus")
-			return fmt.Sprintf(`version: 1
-projects:
-  - id: test-id
-    name: test-project
-    path: /tmp/test
-    status: %s
-    added_at: 2024-01-01T00:00:00Z
-    last_accessed: 2024-01-01T00:00:00Z
-`, invalidStatus)
-		}),
-		rapid.Custom(func(t *rapid.T) string {
-			invalidType := rapid.StringMatching(`[a-z]{5,15}`).Draw(t, "invalidType")
-			return fmt.Sprintf(`version: 1
-projects:
-  - id: test-id
-    name: test-project
-    path: /tmp/test
-    status: active
-    types:
-      - %s
-    added_at: 2024-01-01T00:00:00Z
-    last_accessed: 2024-01-01T00:00:00Z
-`, invalidType)
-		}),
 	)
 }

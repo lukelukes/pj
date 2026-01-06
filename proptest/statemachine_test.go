@@ -51,8 +51,6 @@ func TestProperty_StateMachine_CatalogOperations(t *testing.T) {
 				}
 				id := rapid.SampledFrom(ids).Draw(rt, "id")
 				p, _ := checked.Get(id)
-				newStatus := statusGen().Draw(rt, "newStatus")
-				p = p.WithStatus(newStatus)
 				_ = checked.Update(p)
 			},
 

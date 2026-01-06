@@ -6,27 +6,11 @@ import (
 )
 
 type EditCmd struct {
-	Name   string   `arg:"" help:"Project name to edit" completion:"pj list -n"`
-	Status string   `short:"s" help:"Set status (active, archived, abandoned)"`
-	AddTag []string `help:"Add tags"`
-	RmTag  []string `help:"Remove tags"`
-	Notes  string   `help:"Set notes"`
-	Editor string   `help:"Set editor command (e.g., code, nvim)"`
+	Name   string `arg:"" help:"Project name to edit" completion:"pj list -n"`
+	Editor string `help:"Set editor command (e.g., code, nvim)"`
 }
 
 func (cmd *EditCmd) applyEdits(p *catalog.Project) {
-	if cmd.Status != "" {
-		p.Status = catalog.Status(cmd.Status)
-	}
-	for _, tag := range cmd.AddTag {
-		p.AddTag(tag)
-	}
-	for _, tag := range cmd.RmTag {
-		p.RemoveTag(tag)
-	}
-	if cmd.Notes != "" {
-		p.Notes = cmd.Notes
-	}
 	if cmd.Editor != "" {
 		p.Editor = cmd.Editor
 	}

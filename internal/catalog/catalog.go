@@ -22,9 +22,6 @@ type Catalog interface {
 }
 
 type FilterOptions struct {
-	Status     Status
-	Types      []ProjectType
-	Tags       []string
 	Query      string
 	SortBy     SortField
 	Descending bool
@@ -37,5 +34,4 @@ const (
 	SortByPath         SortField = "path"
 	SortByLastAccessed SortField = "last_accessed"
 	SortByAddedAt      SortField = "added_at"
-	SortByTypes        SortField = "types"
 )

@@ -76,100 +76,6 @@ func TestProject_ValidateAndNormalize(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot access path")
 	})
-
-	t.Run("invalid status fails validation", func(t *testing.T) {
-		p := catalog.NewProject("myproject", tempDir)
-		p.Status = catalog.Status("invalid-status")
-
-		err := p.ValidateAndNormalize()
-
-		assert.ErrorIs(t, err, catalog.ErrInvalidStatus)
-		assert.Contains(t, err.Error(), "invalid-status")
-	})
-
-	t.Run("valid status passes validation", func(t *testing.T) {
-		testCases := []catalog.Status{
-			catalog.StatusActive,
-			catalog.StatusArchived,
-			catalog.StatusAbandoned,
-		}
-
-		for _, status := range testCases {
-			t.Run(string(status), func(t *testing.T) {
-				p := catalog.NewProject("myproject", tempDir)
-				p.Status = status
-
-				err := p.ValidateAndNormalize()
-
-				assert.NoError(t, err)
-			})
-		}
-	})
-
-	t.Run("empty status is allowed", func(t *testing.T) {
-		p := catalog.NewProject("myproject", tempDir)
-		p.Status = ""
-
-		err := p.ValidateAndNormalize()
-
-		assert.NoError(t, err)
-	})
-
-	t.Run("tag cleaning side effects", func(t *testing.T) {
-		t.Run("validate cleans whitespace-only tags as side effect", func(t *testing.T) {
-			p := catalog.NewProject("myproject", tempDir)
-			p.Tags = []string{"valid", "  ", "\t\n", "another-valid", ""}
-
-			err := p.ValidateAndNormalize()
-
-			require.NoError(t, err)
-			assert.Equal(t, []string{"valid", "another-valid"}, p.Tags)
-		})
-
-		t.Run("validate trims tag whitespace as side effect", func(t *testing.T) {
-			p := catalog.NewProject("myproject", tempDir)
-			p.Tags = []string{"  tag1  ", "\ttag2\n", " tag3 "}
-
-			err := p.ValidateAndNormalize()
-
-			require.NoError(t, err)
-			assert.Equal(t, []string{"tag1", "tag2", "tag3"}, p.Tags)
-		})
-
-		t.Run("empty tag slice is preserved", func(t *testing.T) {
-			p := catalog.NewProject("myproject", tempDir)
-			p.Tags = []string{}
-
-			err := p.ValidateAndNormalize()
-
-			require.NoError(t, err)
-			assert.Equal(t, []string{}, p.Tags)
-		})
-
-		t.Run("validate removes all-whitespace tags as side effect", func(t *testing.T) {
-			p := catalog.NewProject("myproject", tempDir)
-			p.Tags = []string{"  ", "\t", "\n", ""}
-
-			err := p.ValidateAndNormalize()
-
-			require.NoError(t, err)
-			assert.Equal(t, []string{}, p.Tags)
-		})
-
-		t.Run("validate is idempotent", func(t *testing.T) {
-			p := catalog.NewProject("myproject", tempDir)
-			p.Tags = []string{"  tag1  ", "tag2", "  "}
-
-			err := p.ValidateAndNormalize()
-			require.NoError(t, err)
-			tagsAfterFirst := make([]string, len(p.Tags))
-			copy(tagsAfterFirst, p.Tags)
-
-			err = p.ValidateAndNormalize()
-			require.NoError(t, err)
-			assert.Equal(t, tagsAfterFirst, p.Tags, "validate should be idempotent")
-		})
-	})
 }
 
 func TestYAMLCatalog_Add_Validation(t *testing.T) {
@@ -203,33 +109,9 @@ func TestYAMLCatalog_Add_Validation(t *testing.T) {
 		assert.ErrorIs(t, err, catalog.ErrPathNotExist)
 	})
 
-	t.Run("rejects project with invalid status", func(t *testing.T) {
-		cat := newTestYAMLCatalog(t)
-		p := catalog.NewProject("myproject", tempDir)
-		p.Status = catalog.Status("invalid")
-
-		err := cat.Add(p)
-
-		assert.ErrorIs(t, err, catalog.ErrInvalidStatus)
-	})
-
-	t.Run("cleans tags when adding", func(t *testing.T) {
-		cat := newTestYAMLCatalog(t)
-		p := catalog.NewProject("myproject", tempDir)
-		p.Tags = []string{"valid", "  ", "another"}
-
-		err := cat.Add(p)
-
-		require.NoError(t, err)
-		stored, _ := cat.Get(p.ID)
-		assert.Equal(t, []string{"valid", "another"}, stored.Tags)
-	})
-
 	t.Run("accepts valid project", func(t *testing.T) {
 		cat := newTestYAMLCatalog(t)
-		p := catalog.NewProject("myproject", tempDir).
-			WithTags("tag1", "tag2").
-			WithStatus(catalog.StatusActive)
+		p := catalog.NewProject("myproject", tempDir)
 
 		err := cat.Add(p)
 
@@ -271,42 +153,6 @@ func TestYAMLCatalog_Update_Validation(t *testing.T) {
 		err := cat.Update(p)
 
 		assert.ErrorIs(t, err, catalog.ErrPathNotExist)
-	})
-
-	t.Run("rejects update with invalid status", func(t *testing.T) {
-		cat := newTestYAMLCatalog(t)
-		p := catalog.NewProject("original", tempDir)
-		require.NoError(t, cat.Add(p))
-
-		p.Status = catalog.Status("invalid")
-		err := cat.Update(p)
-
-		assert.ErrorIs(t, err, catalog.ErrInvalidStatus)
-	})
-
-	t.Run("cleans tags when updating", func(t *testing.T) {
-		cat := newTestYAMLCatalog(t)
-		p := catalog.NewProject("myproject", tempDir)
-		require.NoError(t, cat.Add(p))
-
-		p.Tags = []string{"valid", "  ", "another"}
-		err := cat.Update(p)
-
-		require.NoError(t, err)
-		stored, _ := cat.Get(p.ID)
-		assert.Equal(t, []string{"valid", "another"}, stored.Tags)
-	})
-
-	t.Run("accepts valid update", func(t *testing.T) {
-		cat := newTestYAMLCatalog(t)
-		p := catalog.NewProject("original", tempDir)
-		require.NoError(t, cat.Add(p))
-
-		p.Notes = "Updated notes"
-		p.Status = catalog.StatusArchived
-		err := cat.Update(p)
-
-		assert.NoError(t, err)
 	})
 
 	t.Run("allows updating to different valid path", func(t *testing.T) {

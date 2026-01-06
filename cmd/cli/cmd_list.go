@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"pj/internal/catalog"
-	"strings"
 	"text/tabwriter"
 )
 
@@ -31,21 +30,11 @@ func (cmd *ListCmd) Run(g *Globals) error {
 
 func (cmd *ListCmd) printProjects(g *Globals, projects []catalog.Project) error {
 	w := tabwriter.NewWriter(g.Out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tPATH\tTYPES\tSTATUS\tTAGS")
-	fmt.Fprintln(w, "----\t----\t-----\t------\t----")
+	fmt.Fprintln(w, "NAME\tPATH")
+	fmt.Fprintln(w, "----\t----")
 
 	for _, p := range projects {
-		tags := strings.Join(p.Tags, ", ")
-		types := make([]string, len(p.Types))
-		for i, t := range p.Types {
-			types[i] = string(t)
-		}
-		typesStr := strings.Join(types, ", ")
-		if typesStr == "" {
-			typesStr = "unknown"
-		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-			p.Name, shortenPath(p.Path), typesStr, p.Status, tags)
+		fmt.Fprintf(w, "%s\t%s\n", p.Name, shortenPath(p.Path))
 	}
 
 	return w.Flush()

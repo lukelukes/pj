@@ -50,71 +50,19 @@ func TestAddCmd_Run(t *testing.T) {
 		require.Len(t, projects, 1)
 		assert.Equal(t, "test-project", projects[0].Name)
 		assert.Equal(t, projectDir, projects[0].Path)
-		assert.Equal(t, catalog.StatusActive, projects[0].Status)
 	})
 
 	t.Run("adds project with default name from directory", func(t *testing.T) {
 		g, _ := newTestGlobals(t)
 		projectDir := t.TempDir()
 
-		cmd := AddCmd{Path: projectDir} // No explicit name
+		cmd := AddCmd{Path: projectDir}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
 		projects := g.Cat.List()
 		require.Len(t, projects, 1)
 		assert.Equal(t, filepath.Base(projectDir), projects[0].Name)
-	})
-
-	t.Run("adds project with tags", func(t *testing.T) {
-		g, _ := newTestGlobals(t)
-		projectDir := t.TempDir()
-
-		cmd := AddCmd{
-			Path: projectDir,
-			Name: "tagged-project",
-			Tags: []string{"backend", "api"},
-		}
-		err := cmd.Run(g)
-
-		require.NoError(t, err)
-		projects := g.Cat.List()
-		require.Len(t, projects, 1)
-		assert.ElementsMatch(t, []string{"backend", "api"}, projects[0].Tags)
-	})
-
-	t.Run("detects Go project type", func(t *testing.T) {
-		g, _ := newTestGlobals(t)
-		projectDir := t.TempDir()
-
-		goModPath := filepath.Join(projectDir, "go.mod")
-		err := os.WriteFile(goModPath, []byte("module test\n"), 0o644)
-		require.NoError(t, err)
-
-		cmd := AddCmd{Path: projectDir, Name: "go-project"}
-		err = cmd.Run(g)
-
-		require.NoError(t, err)
-		projects := g.Cat.List()
-		require.Len(t, projects, 1)
-		assert.Contains(t, projects[0].Types, catalog.TypeGo)
-	})
-
-	t.Run("detects Node project type", func(t *testing.T) {
-		g, _ := newTestGlobals(t)
-		projectDir := t.TempDir()
-
-		packageJSONPath := filepath.Join(projectDir, "package.json")
-		err := os.WriteFile(packageJSONPath, []byte("{}"), 0o644)
-		require.NoError(t, err)
-
-		cmd := AddCmd{Path: projectDir, Name: "node-project"}
-		err = cmd.Run(g)
-
-		require.NoError(t, err)
-		projects := g.Cat.List()
-		require.Len(t, projects, 1)
-		assert.Contains(t, projects[0].Types, catalog.TypeNode)
 	})
 
 	t.Run("returns error for nonexistent path", func(t *testing.T) {
@@ -206,9 +154,7 @@ func TestListCmd_Run(t *testing.T) {
 		output := out.String()
 		assert.Contains(t, output, "NAME")
 		assert.Contains(t, output, "PATH")
-		assert.Contains(t, output, "STATUS")
 		assert.Contains(t, output, "my-project")
-		assert.Contains(t, output, "active")
 	})
 }
 
@@ -276,7 +222,7 @@ func TestRmCmd_Run(t *testing.T) {
 	t.Run("outputs removal confirmation", func(t *testing.T) {
 		g, out := newTestGlobals(t)
 		createTestProject(t, g, "doomed-project")
-		out.Reset() // Clear the "Added" output
+		out.Reset()
 
 		cmd := RmCmd{Name: "doomed-project"}
 		err := cmd.Run(g)
@@ -289,7 +235,6 @@ func TestRmCmd_Run(t *testing.T) {
 }
 
 func TestOpenCmd_Run(t *testing.T) {
-	// Use 'true' command as editor - it exists and does nothing
 	t.Setenv("EDITOR", "true")
 
 	t.Run("launches editor and updates last accessed", func(t *testing.T) {
@@ -380,99 +325,10 @@ func TestOpenCmd_Run(t *testing.T) {
 }
 
 func TestEditCmd_Run(t *testing.T) {
-	t.Run("modifies project status", func(t *testing.T) {
-		g, _ := newTestGlobals(t)
-		createTestProject(t, g, "test-project")
-
-		cmd := EditCmd{Name: "test-project", Status: "archived"}
-		err := cmd.Run(g)
-
-		require.NoError(t, err)
-		projects := g.Cat.Search("test-project")
-		require.Len(t, projects, 1)
-		assert.Equal(t, catalog.StatusArchived, projects[0].Status)
-	})
-
-	t.Run("adds tags to project", func(t *testing.T) {
-		g, _ := newTestGlobals(t)
-		createTestProject(t, g, "test-project")
-
-		cmd := EditCmd{
-			Name:   "test-project",
-			AddTag: []string{"backend", "api"},
-		}
-		err := cmd.Run(g)
-
-		require.NoError(t, err)
-		projects := g.Cat.Search("test-project")
-		require.Len(t, projects, 1)
-		assert.ElementsMatch(t, []string{"backend", "api"}, projects[0].Tags)
-	})
-
-	t.Run("removes tags from project", func(t *testing.T) {
-		g, _ := newTestGlobals(t)
-
-		projectDir := t.TempDir()
-		cmd1 := AddCmd{
-			Path: projectDir,
-			Name: "test-project",
-			Tags: []string{"backend", "api", "old"},
-		}
-		require.NoError(t, cmd1.Run(g))
-
-		cmd := EditCmd{
-			Name:  "test-project",
-			RmTag: []string{"old"},
-		}
-		err := cmd.Run(g)
-
-		require.NoError(t, err)
-		projects := g.Cat.Search("test-project")
-		require.Len(t, projects, 1)
-		assert.ElementsMatch(t, []string{"backend", "api"}, projects[0].Tags)
-		assert.False(t, projects[0].HasTag("old"))
-	})
-
-	t.Run("sets project notes", func(t *testing.T) {
-		g, _ := newTestGlobals(t)
-		createTestProject(t, g, "test-project")
-
-		cmd := EditCmd{
-			Name:  "test-project",
-			Notes: "This is a test project",
-		}
-		err := cmd.Run(g)
-
-		require.NoError(t, err)
-		projects := g.Cat.Search("test-project")
-		require.Len(t, projects, 1)
-		assert.Equal(t, "This is a test project", projects[0].Notes)
-	})
-
-	t.Run("modifies multiple fields at once", func(t *testing.T) {
-		g, _ := newTestGlobals(t)
-		createTestProject(t, g, "test-project")
-
-		cmd := EditCmd{
-			Name:   "test-project",
-			Status: "archived",
-			AddTag: []string{"legacy"},
-			Notes:  "Archived project",
-		}
-		err := cmd.Run(g)
-
-		require.NoError(t, err)
-		projects := g.Cat.Search("test-project")
-		require.Len(t, projects, 1)
-		assert.Equal(t, catalog.StatusArchived, projects[0].Status)
-		assert.Contains(t, projects[0].Tags, "legacy")
-		assert.Equal(t, "Archived project", projects[0].Notes)
-	})
-
 	t.Run("returns error for nonexistent project", func(t *testing.T) {
 		g, _ := newTestGlobals(t)
 
-		cmd := EditCmd{Name: "nonexistent", Status: "archived"}
+		cmd := EditCmd{Name: "nonexistent", Editor: "nvim"}
 		err := cmd.Run(g)
 
 		assert.Error(t, err)
@@ -484,40 +340,14 @@ func TestEditCmd_Run(t *testing.T) {
 		createTestProject(t, g, "test-project-1")
 		createTestProject(t, g, "test-project-2")
 
-		cmd := EditCmd{Name: "test", Status: "archived"}
+		cmd := EditCmd{Name: "test", Editor: "nvim"}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
 		projects := g.Cat.List()
 		for _, p := range projects {
-			assert.Equal(t, catalog.StatusActive, p.Status)
+			assert.Empty(t, p.Editor)
 		}
-	})
-
-	t.Run("adds and removes tags in same operation", func(t *testing.T) {
-		g, _ := newTestGlobals(t)
-
-		projectDir := t.TempDir()
-		cmd1 := AddCmd{
-			Path: projectDir,
-			Name: "test-project",
-			Tags: []string{"old-tag"},
-		}
-		require.NoError(t, cmd1.Run(g))
-
-		cmd := EditCmd{
-			Name:   "test-project",
-			AddTag: []string{"new-tag"},
-			RmTag:  []string{"old-tag"},
-		}
-		err := cmd.Run(g)
-
-		require.NoError(t, err)
-		projects := g.Cat.Search("test-project")
-		require.Len(t, projects, 1)
-		assert.ElementsMatch(t, []string{"new-tag"}, projects[0].Tags)
-		assert.False(t, projects[0].HasTag("old-tag"))
-		assert.True(t, projects[0].HasTag("new-tag"))
 	})
 
 	t.Run("outputs update confirmation", func(t *testing.T) {
@@ -525,7 +355,7 @@ func TestEditCmd_Run(t *testing.T) {
 		createTestProject(t, g, "test-project")
 		out.Reset()
 
-		cmd := EditCmd{Name: "test-project", Status: "archived"}
+		cmd := EditCmd{Name: "test-project", Editor: "nvim"}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
@@ -539,15 +369,11 @@ func TestIntegration_MultipleOperations(t *testing.T) {
 	g, _ := newTestGlobals(t)
 
 	goDir := t.TempDir()
-	err := os.WriteFile(filepath.Join(goDir, "go.mod"), []byte("module test\n"), 0o644)
-	require.NoError(t, err)
-	cmd1 := AddCmd{Path: goDir, Name: "go-project", Tags: []string{"backend"}}
+	cmd1 := AddCmd{Path: goDir, Name: "go-project"}
 	require.NoError(t, cmd1.Run(g))
 
 	nodeDir := t.TempDir()
-	err = os.WriteFile(filepath.Join(nodeDir, "package.json"), []byte("{}"), 0o644)
-	require.NoError(t, err)
-	cmd2 := AddCmd{Path: nodeDir, Name: "node-project", Tags: []string{"frontend"}}
+	cmd2 := AddCmd{Path: nodeDir, Name: "node-project"}
 	require.NoError(t, cmd2.Run(g))
 
 	assert.Equal(t, 2, g.Cat.Count())
@@ -556,19 +382,14 @@ func TestIntegration_MultipleOperations(t *testing.T) {
 
 	editCmd := EditCmd{
 		Name:   "go-project",
-		Status: "archived",
-		AddTag: []string{"legacy"},
-		Notes:  "Old backend project",
+		Editor: "nvim",
 	}
 	require.NoError(t, editCmd.Run(g))
 
 	projects := g.Cat.Search("go-project")
 	require.Len(t, projects, 1)
 	p := projects[0]
-	assert.Equal(t, catalog.StatusArchived, p.Status)
-	assert.Contains(t, p.Tags, "legacy")
-	assert.Contains(t, p.Tags, "backend")
-	assert.Equal(t, "Old backend project", p.Notes)
+	assert.Equal(t, "nvim", p.Editor)
 
 	rmCmd := RmCmd{Name: "node-project"}
 	require.NoError(t, rmCmd.Run(g))
@@ -656,27 +477,18 @@ func TestCatalogPathDefault(t *testing.T) {
 }
 
 func TestShowCmd_Run(t *testing.T) {
-	t.Run("displays all fields", func(t *testing.T) {
+	t.Run("displays project fields", func(t *testing.T) {
 		g, out := newTestGlobals(t)
-
-		projectDir := t.TempDir()
-		err := os.WriteFile(filepath.Join(projectDir, "go.mod"), []byte("module test\n"), 0o644)
-		require.NoError(t, err)
-
-		addCmd := AddCmd{Path: projectDir, Name: "test-project", Tags: []string{"backend", "api"}}
-		require.NoError(t, addCmd.Run(g))
+		createTestProject(t, g, "test-project")
 
 		out.Reset()
 		cmd := ShowCmd{Name: "test-project"}
-		err = cmd.Run(g)
+		err := cmd.Run(g)
 
 		require.NoError(t, err)
 		output := out.String()
 		assert.Contains(t, output, "Name:   test-project")
 		assert.Contains(t, output, "Path:")
-		assert.Contains(t, output, "Status: active")
-		assert.Contains(t, output, "Tags:   backend, api")
-		assert.Contains(t, output, "Types:  go")
 	})
 
 	t.Run("outputs only path with --path flag", func(t *testing.T) {
@@ -772,7 +584,7 @@ func TestOpenCmd_UsesProjectEditor(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, "true", editorUsed)
-		_ = projectDir // Used by createTestProject
+		_ = projectDir
 	})
 }
 
@@ -783,7 +595,6 @@ func TestOpenCmd_PathNotExist(t *testing.T) {
 		g, _ := newTestGlobals(t)
 		projectDir := createTestProject(t, g, "test-project")
 
-		// Delete the project directory
 		require.NoError(t, os.RemoveAll(projectDir))
 
 		cmd := OpenCmd{Name: "test-project"}
@@ -901,7 +712,6 @@ func TestKongAliases(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			// Kong exits on --help, so we check that it parsed without panic
 			require.NotPanics(t, func() {
 				_, _ = parser.Parse([]string{tc.alias, "--help"})
 			})

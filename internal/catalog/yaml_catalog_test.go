@@ -84,20 +84,6 @@ func TestYAMLCatalog_GetByPath(t *testing.T) {
 }
 
 func TestYAMLCatalog_Update(t *testing.T) {
-	t.Run("updates existing project", func(t *testing.T) {
-		cat := newTestYAMLCatalog(t)
-		dir := newTestDir(t)
-		p := catalog.NewProject("myproject", dir)
-		require.NoError(t, cat.Add(p))
-
-		p.Notes = "Updated notes"
-		err := cat.Update(p)
-
-		require.NoError(t, err)
-		got, _ := cat.Get(p.ID)
-		assert.Equal(t, "Updated notes", got.Notes)
-	})
-
 	t.Run("returns error when project not found", func(t *testing.T) {
 		cat := newTestYAMLCatalog(t)
 		dir := newTestDir(t)
@@ -231,46 +217,26 @@ func TestYAMLCatalog_Search(t *testing.T) {
 }
 
 func TestYAMLCatalog_Filter(t *testing.T) {
-	t.Run("filters by status", func(t *testing.T) {
+	t.Run("filters by query", func(t *testing.T) {
 		cat := newTestYAMLCatalog(t)
-		p1 := catalog.NewProject("active", newTestDir(t))
-		p2 := catalog.NewProject("archived", newTestDir(t))
-		p2.Status = catalog.StatusArchived
-		require.NoError(t, cat.Add(p1))
-		require.NoError(t, cat.Add(p2))
+		require.NoError(t, cat.Add(catalog.NewProject("project-one", newTestDir(t))))
+		require.NoError(t, cat.Add(catalog.NewProject("project-two", newTestDir(t))))
+		require.NoError(t, cat.Add(catalog.NewProject("something-else", newTestDir(t))))
 
-		results := cat.Filter(catalog.FilterOptions{Status: catalog.StatusActive})
+		results := cat.Filter(catalog.FilterOptions{Query: "project"})
 
-		assert.Len(t, results, 1)
-		assert.Equal(t, "active", results[0].Name)
+		assert.Len(t, results, 2)
 	})
 
-	t.Run("filters by type", func(t *testing.T) {
+	t.Run("returns all when no filter", func(t *testing.T) {
 		cat := newTestYAMLCatalog(t)
-		p1 := catalog.NewProject("goproject", newTestDir(t)).WithTypes(catalog.TypeGo)
-		p2 := catalog.NewProject("rustproject", newTestDir(t)).WithTypes(catalog.TypeRust)
-		require.NoError(t, cat.Add(p1))
-		require.NoError(t, cat.Add(p2))
+		require.NoError(t, cat.Add(catalog.NewProject("p1", newTestDir(t))))
+		require.NoError(t, cat.Add(catalog.NewProject("p2", newTestDir(t))))
+		require.NoError(t, cat.Add(catalog.NewProject("p3", newTestDir(t))))
 
-		results := cat.Filter(catalog.FilterOptions{Types: []catalog.ProjectType{catalog.TypeGo}})
+		results := cat.Filter(catalog.FilterOptions{})
 
-		assert.Len(t, results, 1)
-		assert.Equal(t, "goproject", results[0].Name)
-	})
-
-	t.Run("filters by tags (all must match)", func(t *testing.T) {
-		cat := newTestYAMLCatalog(t)
-		p1 := catalog.NewProject("p1", newTestDir(t)).WithTags("work", "frontend")
-		p2 := catalog.NewProject("p2", newTestDir(t)).WithTags("work", "backend")
-		p3 := catalog.NewProject("p3", newTestDir(t)).WithTags("personal")
-		require.NoError(t, cat.Add(p1))
-		require.NoError(t, cat.Add(p2))
-		require.NoError(t, cat.Add(p3))
-
-		results := cat.Filter(catalog.FilterOptions{Tags: []string{"work", "frontend"}})
-
-		assert.Len(t, results, 1)
-		assert.Equal(t, "p1", results[0].Name)
+		assert.Len(t, results, 3)
 	})
 }
 
@@ -284,10 +250,7 @@ func TestYAMLCatalog_Persistence(t *testing.T) {
 
 		cat1, err := catalog.NewYAMLCatalog(path)
 		require.NoError(t, err)
-		p := catalog.NewProject("myproject", projectDir).
-			WithTypes(catalog.TypeGo).
-			WithTags("work", "tools").
-			WithNotes("Important project")
+		p := catalog.NewProject("myproject", projectDir)
 		require.NoError(t, cat1.Add(p))
 		require.NoError(t, cat1.Save())
 
@@ -299,9 +262,6 @@ func TestYAMLCatalog_Persistence(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, p.Name, got.Name)
 		assert.Equal(t, p.Path, got.Path)
-		assert.Equal(t, p.Types, got.Types)
-		assert.Equal(t, p.Tags, got.Tags)
-		assert.Equal(t, p.Notes, got.Notes)
 	})
 
 	t.Run("load creates empty catalog if file doesn't exist", func(t *testing.T) {
@@ -445,9 +405,9 @@ func TestYAMLCatalog_ConcurrentAccess(t *testing.T) {
 	t.Run("handles concurrent read operations safely", func(t *testing.T) {
 		cat := newTestYAMLCatalog(t)
 
-		p1 := catalog.NewProject("project1", newTestDir(t)).WithTags("work", "frontend")
-		p2 := catalog.NewProject("project2", newTestDir(t)).WithTypes(catalog.TypeGo)
-		p3 := catalog.NewProject("project3", newTestDir(t)).WithTags("personal")
+		p1 := catalog.NewProject("project1", newTestDir(t))
+		p2 := catalog.NewProject("project2", newTestDir(t))
+		p3 := catalog.NewProject("project3", newTestDir(t))
 		require.NoError(t, cat.Add(p1))
 		require.NoError(t, cat.Add(p2))
 		require.NoError(t, cat.Add(p3))
@@ -471,7 +431,7 @@ func TestYAMLCatalog_ConcurrentAccess(t *testing.T) {
 					count := cat.Count()
 					assert.Equal(t, 3, count)
 				case 3:
-					results := cat.Filter(catalog.FilterOptions{Tags: []string{"work"}})
+					results := cat.Filter(catalog.FilterOptions{Query: "project"})
 					assert.NotEmpty(t, results)
 				}
 			}(i)
@@ -481,38 +441,6 @@ func TestYAMLCatalog_ConcurrentAccess(t *testing.T) {
 
 		assert.Equal(t, 3, cat.Count())
 		assert.Len(t, cat.List(), 3)
-	})
-
-	t.Run("handles concurrent read operations safely", func(t *testing.T) {
-		cat := newTestYAMLCatalog(t)
-
-		p := catalog.NewProject("initial", newTestDir(t))
-		require.NoError(t, cat.Add(p))
-
-		const numGoroutines = 100
-		var wg sync.WaitGroup
-		wg.Add(numGoroutines)
-
-		for i := range numGoroutines {
-			go func(id int) {
-				defer wg.Done()
-
-				switch id % 3 {
-				case 0:
-					cat.Search("initial")
-				case 1:
-					cat.Get(p.ID)
-				case 2:
-					cat.List()
-				}
-			}(i)
-		}
-
-		wg.Wait()
-
-		assert.GreaterOrEqual(t, cat.Count(), 1)
-		_, err := cat.Get(p.ID)
-		assert.NoError(t, err)
 	})
 
 	t.Run("handles concurrent add and remove safely", func(t *testing.T) {

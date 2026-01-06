@@ -35,16 +35,10 @@ _pj() {
                 a|add)
                     _arguments \
                         '(-n --name)'{-n,--name}'[Project name]:name:' \
-                        '(-t --tags)'{-t,--tags}'[Tags]:tags:' \
                         '1:path:_files -/'
                     ;;
                 ls|list)
                     _arguments \
-                        '(-s --status)'{-s,--status}'[Filter by status]:status:(active archived abandoned)' \
-                        '(-T --types)'{-T,--types}'[Filter by types]:types:' \
-                        '(-t --tags)'{-t,--tags}'[Filter by tags]:tags:' \
-                        '(-r --recent)'{-r,--recent}'[Sort by last accessed]' \
-                        '--json[Output as JSON]' \
                         '(-n --names)'{-n,--names}'[Output only names]'
                     ;;
                 rm)
@@ -55,9 +49,6 @@ _pj() {
                     ;;
                 e|edit)
                     _arguments \
-                        '(-s --status)'{-s,--status}'[Set status]:status:(active archived abandoned)' \
-                        '--add-tag[Add tags]:tag:' \
-                        '--rm-tag[Remove tags]:tag:' \
                         '--notes[Set notes]:notes:' \
                         '--editor[Set editor]:editor:' \
                         '1:project:_pj_projects'

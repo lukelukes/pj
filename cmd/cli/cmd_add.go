@@ -9,9 +9,8 @@ import (
 )
 
 type AddCmd struct {
-	Path string   `arg:"" help:"Path to the project directory"`
-	Name string   `short:"n" help:"Project name (defaults to directory name)"`
-	Tags []string `short:"t" help:"Tags to add to the project"`
+	Path string `arg:"" help:"Path to the project directory"`
+	Name string `short:"n" help:"Project name (defaults to directory name)"`
 }
 
 func (cmd *AddCmd) Run(g *Globals) error {
@@ -35,11 +34,6 @@ func (cmd *AddCmd) Run(g *Globals) error {
 	}
 
 	p := catalog.NewProject(name, path)
-	if len(cmd.Tags) > 0 {
-		p = p.WithTags(cmd.Tags...)
-	}
-
-	p = p.WithTypes(catalog.DetectProjectTypes(path)...)
 
 	if err := cat.Add(p); err != nil {
 		return fmt.Errorf("failed to add project %q: %w", name, err)
