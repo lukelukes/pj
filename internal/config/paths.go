@@ -31,6 +31,17 @@ func DefaultProjectsDir() string {
 	return home
 }
 
+func ShortenPath(path string) string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return path
+	}
+	if strings.HasPrefix(path, home) {
+		return "~" + path[len(home):]
+	}
+	return path
+}
+
 func ExpandPath(path string) (string, error) {
 	if strings.TrimSpace(path) == "" {
 		return "", errors.New("path cannot be empty")

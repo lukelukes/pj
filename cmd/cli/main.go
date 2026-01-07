@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"pj/cmd/cli/render"
 	"pj/internal/catalog"
 	"pj/internal/config"
 
@@ -37,7 +38,11 @@ func (c *CLI) AfterApply(ctx *kong.Context) error {
 		return fmt.Errorf("failed to load catalog: %w", err)
 	}
 
-	globals := &Globals{Cat: cat, Out: os.Stdout}
+	globals := &Globals{
+		Cat:    cat,
+		Out:    os.Stdout,
+		Render: render.NewLipglossRendererAuto(os.Stdout),
+	}
 	ctx.Bind(globals)
 	return nil
 }

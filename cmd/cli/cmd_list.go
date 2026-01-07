@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
-	"pj/internal/catalog"
-	"text/tabwriter"
+	"os"
+	"pj/cmd/cli/render"
+	"slices"
+	"time"
 )
 
 type ListCmd struct {
@@ -20,22 +22,28 @@ func (cmd *ListCmd) Run(g *Globals) error {
 		return nil
 	}
 
-	if len(projects) == 0 {
-		fmt.Fprintln(g.Out, "No projects found.")
-		return nil
+	items := make([]render.ProjectListItem, len(projects))
+	for i, p := range projects {
+		items[i] = render.ProjectListItem{
+			Name:        p.Name,
+			Path:        p.Path,
+			Description: p.Description,
+			Timestamp:   getMtime(p.Path),
+		}
 	}
+	slices.SortFunc(items, func(a, b render.ProjectListItem) int {
+		return b.Timestamp.Compare(a.Timestamp)
+	})
 
-	return cmd.printProjects(g, projects)
+	view := render.ProjectListView{Items: items}
+	output := g.Render.RenderProjectList(view)
+	_, err := fmt.Fprint(g.Out, output)
+	return err
 }
 
-func (cmd *ListCmd) printProjects(g *Globals, projects []catalog.Project) error {
-	w := tabwriter.NewWriter(g.Out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tPATH")
-	fmt.Fprintln(w, "----\t----")
-
-	for _, p := range projects {
-		fmt.Fprintf(w, "%s\t%s\n", p.Name, shortenPath(p.Path))
+func getMtime(path string) time.Time {
+	if info, err := os.Stat(path); err == nil {
+		return info.ModTime()
 	}
-
-	return w.Flush()
+	return time.Time{}
 }

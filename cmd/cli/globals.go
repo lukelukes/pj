@@ -4,12 +4,14 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"pj/cmd/cli/render"
 	"pj/internal/catalog"
 )
 
 type Globals struct {
 	Cat    catalog.Catalog
 	Out    io.Writer
+	Render render.Renderer
 	RunCmd func(name string, args ...string) error
 }
 

@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"pj/internal/catalog"
-	"strings"
 )
 
 type AmbiguousMatchError struct {
@@ -58,12 +57,4 @@ func resolveEditor(project catalog.Project) (string, error) {
 		return "", fmt.Errorf("editor %q not found in PATH", editor)
 	}
 	return editor, nil
-}
-
-func shortenPath(path string) string {
-	home, _ := os.UserHomeDir()
-	if strings.HasPrefix(path, home) {
-		return "~" + path[len(home):]
-	}
-	return path
 }

@@ -5,26 +5,39 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"pj/cmd/cli/render"
 	"pj/internal/catalog"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/alecthomas/kong"
+	"github.com/charmbracelet/x/exp/golden"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+var testFixedNow = time.Date(2026, 1, 7, 12, 0, 0, 0, time.Local)
+
 func newTestGlobals(t *testing.T) (*Globals, *bytes.Buffer) {
+	t.Helper()
+	g, buf, _ := newTestGlobalsCore(t)
+	return g, buf
+}
+
+func newTestGlobalsCore(t *testing.T) (*Globals, *bytes.Buffer, map[string]string) {
 	t.Helper()
 	dir := t.TempDir()
 	cat, err := catalog.NewYAMLCatalog(filepath.Join(dir, "catalog.yaml"))
 	require.NoError(t, err)
 	buf := &bytes.Buffer{}
+	pathMap := make(map[string]string)
 	return &Globals{
 		Cat:    cat,
 		Out:    buf,
+		Render: render.NewLipglossRenderer(buf, 80).WithClock(func() time.Time { return testFixedNow }),
 		RunCmd: func(name string, args ...string) error { return nil },
-	}, buf
+	}, buf, pathMap
 }
 
 func createTestProject(t *testing.T, g *Globals, name string) string {
@@ -143,18 +156,32 @@ func TestListCmd_Run(t *testing.T) {
 		assert.Equal(t, 2, g.Cat.Count())
 	})
 
-	t.Run("output includes header and project data", func(t *testing.T) {
+	t.Run("output includes project name and path", func(t *testing.T) {
 		g, out := newTestGlobals(t)
-		createTestProject(t, g, "my-project")
+		projectDir := createTestProject(t, g, "my-project")
 
 		cmd := ListCmd{}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
 		output := out.String()
-		assert.Contains(t, output, "NAME")
-		assert.Contains(t, output, "PATH")
 		assert.Contains(t, output, "my-project")
+		assert.Contains(t, output, projectDir)
+	})
+
+	t.Run("names flag outputs only names", func(t *testing.T) {
+		g, out := newTestGlobals(t)
+		createTestProject(t, g, "alpha")
+		createTestProject(t, g, "beta")
+
+		cmd := ListCmd{Names: true}
+		err := cmd.Run(g)
+
+		require.NoError(t, err)
+		output := out.String()
+		assert.Contains(t, output, "alpha\n")
+		assert.Contains(t, output, "beta\n")
+		assert.NotContains(t, output, "  ") // no indentation from card format
 	})
 }
 
@@ -717,4 +744,90 @@ func TestKongAliases(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestListCmd_GoldenOutput(t *testing.T) {
+	t.Run("empty list", func(t *testing.T) {
+		g, out, _ := newGoldenTestGlobals(t)
+
+		cmd := ListCmd{}
+		err := cmd.Run(g)
+
+		require.NoError(t, err)
+		golden.RequireEqual(t, []byte(out.String()))
+	})
+
+	t.Run("single project", func(t *testing.T) {
+		g, out, pathMap := newGoldenTestGlobals(t)
+		addProjectWithTime(t, g, pathMap, "pj", "Project tracker and launcher CLI",
+			time.Date(2026, 1, 7, 10, 0, 0, 0, time.Local))
+
+		cmd := ListCmd{}
+		err := cmd.Run(g)
+
+		require.NoError(t, err)
+		golden.RequireEqual(t, []byte(normalizePaths(out.String(), pathMap)))
+	})
+
+	t.Run("multiple projects", func(t *testing.T) {
+		g, out, pathMap := newGoldenTestGlobals(t)
+		addProjectWithTime(t, g, pathMap, "pj", "Project tracker and launcher CLI",
+			time.Date(2026, 1, 7, 10, 0, 0, 0, time.Local))
+		addProjectWithTime(t, g, pathMap, "booster", "Go build tool with plugin architecture",
+			time.Date(2026, 1, 6, 8, 0, 0, 0, time.Local))
+
+		cmd := ListCmd{}
+		err := cmd.Run(g)
+
+		require.NoError(t, err)
+		golden.RequireEqual(t, []byte(normalizePaths(out.String(), pathMap)))
+	})
+
+	t.Run("no description", func(t *testing.T) {
+		g, out, pathMap := newGoldenTestGlobals(t)
+		addProjectWithTime(t, g, pathMap, "dotfiles", "",
+			time.Date(2026, 1, 5, 12, 0, 0, 0, time.Local))
+
+		cmd := ListCmd{}
+		err := cmd.Run(g)
+
+		require.NoError(t, err)
+		golden.RequireEqual(t, []byte(normalizePaths(out.String(), pathMap)))
+	})
+
+	t.Run("stale project", func(t *testing.T) {
+		g, out, pathMap := newGoldenTestGlobals(t)
+		addProjectWithTime(t, g, pathMap, "old-experiment", "Abandoned spike",
+			time.Date(2024, 10, 1, 0, 0, 0, 0, time.Local))
+
+		cmd := ListCmd{}
+		err := cmd.Run(g)
+
+		require.NoError(t, err)
+		golden.RequireEqual(t, []byte(normalizePaths(out.String(), pathMap)))
+	})
+}
+
+func newGoldenTestGlobals(t *testing.T) (*Globals, *bytes.Buffer, map[string]string) {
+	t.Helper()
+	return newTestGlobalsCore(t)
+}
+
+func addProjectWithTime(t *testing.T, g *Globals, pathMap map[string]string, name, description string, mtime time.Time) {
+	t.Helper()
+	projectDir := t.TempDir()
+	require.NoError(t, os.Chtimes(projectDir, mtime, mtime))
+	p := catalog.NewProject(name, projectDir)
+	p.Description = description
+	p.LastAccessed = mtime
+	require.NoError(t, g.Cat.Add(p))
+	pathMap[projectDir] = "/home/user/projects/" + name
+}
+
+func normalizePaths(output string, pathMap map[string]string) string {
+	result := output
+	for actual, normalized := range pathMap {
+		result = strings.ReplaceAll(result, actual, normalized)
+	}
+	return result
 }
