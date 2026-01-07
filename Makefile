@@ -13,6 +13,7 @@ LDFLAGS := -ldflags "-s -w -X main.Version=$(VERSION) -X main.Commit=$(COMMIT) -
 .PHONY: all build test test-property test-property-deep test-integration test-all coverage clean install help
 .PHONY: mutation mutation-dry mutation-diff mutation-report
 .PHONY: release release-dry
+.PHONY: b t ta l f v c i cov
 
 all: build
 
@@ -119,5 +120,16 @@ help: ## Show this help (auto-generated)
 		/^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0,5); next } \
 		/^[a-zA-Z0-9_.-]+:.*##/ { printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2 } \
 		END { if (NR==0) print "No help available.\n" }' $(MAKEFILE_LIST)
+
+##@ Aliases
+b: build    ## build
+t: test     ## test
+ta: test-all ## test-all
+l: lint     ## lint
+f: fmt      ## fmt
+v: verify-dev ## verify-dev
+c: clean    ## clean
+i: install  ## install
+cov: coverage ## coverage
 
 .DEFAULT_GOAL := help
