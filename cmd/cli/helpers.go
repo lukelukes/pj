@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"pj/internal/catalog"
+	"strings"
 )
 
 type AmbiguousMatchError struct {
@@ -45,7 +46,39 @@ func findProject(cat catalog.Catalog, query string) (catalog.Project, error) {
 	return projects[0], nil
 }
 
-func resolveEditor(project catalog.Project) (string, error) {
+func splitCommand(s string) []string {
+	var result []string
+	var current strings.Builder
+	var inQuote rune
+
+	for _, r := range s {
+		if inQuote != 0 {
+			if r == inQuote {
+				inQuote = 0
+			} else {
+				current.WriteRune(r)
+			}
+			continue
+		}
+		switch r {
+		case '"', '\'':
+			inQuote = r
+		case ' ', '\t':
+			if current.Len() > 0 {
+				result = append(result, current.String())
+				current.Reset()
+			}
+		default:
+			current.WriteRune(r)
+		}
+	}
+	if current.Len() > 0 {
+		result = append(result, current.String())
+	}
+	return result
+}
+
+func resolveEditor(project catalog.Project) ([]string, error) {
 	editor := project.Editor
 	if editor == "" {
 		editor = os.Getenv("EDITOR")
@@ -53,8 +86,14 @@ func resolveEditor(project catalog.Project) (string, error) {
 	if editor == "" {
 		editor = "vim"
 	}
-	if _, err := exec.LookPath(editor); err != nil {
-		return "", fmt.Errorf("editor %q not found in PATH", editor)
+
+	parts := splitCommand(editor)
+	if len(parts) == 0 {
+		return nil, fmt.Errorf("editor %q is empty after parsing", editor)
 	}
-	return editor, nil
+
+	if _, err := exec.LookPath(parts[0]); err != nil {
+		return nil, fmt.Errorf("editor %q not found in PATH", parts[0])
+	}
+	return parts, nil
 }

@@ -40,5 +40,5 @@ func (cmd *OpenCmd) Run(g *Globals) error {
 	if runCmd == nil {
 		runCmd = defaultRunCmd
 	}
-	return runCmd(editor, project.Path)
+	return runCmd(editor[0], append(editor[1:], project.Path)...)
 }

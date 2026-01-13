@@ -613,6 +613,32 @@ func TestOpenCmd_UsesProjectEditor(t *testing.T) {
 		assert.Equal(t, "true", editorUsed)
 		_ = projectDir
 	})
+
+	t.Run("passes editor arguments to command", func(t *testing.T) {
+		g, _ := newTestGlobals(t)
+		projectDir := createTestProject(t, g, "test-project")
+
+		projects := g.Cat.Search("test-project")
+		require.Len(t, projects, 1)
+		p := projects[0]
+		p.Editor = "true -v -x"
+		require.NoError(t, g.Cat.Update(p))
+
+		var capturedName string
+		var capturedArgs []string
+		g.RunCmd = func(name string, args ...string) error {
+			capturedName = name
+			capturedArgs = args
+			return nil
+		}
+
+		cmd := OpenCmd{Name: "test-project"}
+		err := cmd.Run(g)
+
+		require.NoError(t, err)
+		assert.Equal(t, "true", capturedName)
+		assert.Equal(t, []string{"-v", "-x", projectDir}, capturedArgs)
+	})
 }
 
 func TestOpenCmd_PathNotExist(t *testing.T) {
@@ -633,12 +659,44 @@ func TestOpenCmd_PathNotExist(t *testing.T) {
 	})
 }
 
+func TestSplitCommand(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []string
+	}{
+		{"simple command", "vim", []string{"vim"}},
+		{"command with arg", "code -w", []string{"code", "-w"}},
+		{"multiple args", "nvim --listen /tmp/nvim.sock", []string{"nvim", "--listen", "/tmp/nvim.sock"}},
+		{"double quoted arg", `code --goto "file:10"`, []string{"code", "--goto", "file:10"}},
+		{"single quoted arg", `vim -c 'set number'`, []string{"vim", "-c", "set number"}},
+		{"path with spaces", `code "/path/with spaces/file.txt"`, []string{"code", "/path/with spaces/file.txt"}},
+		{"multiple spaces", "vim    -p", []string{"vim", "-p"}},
+		{"empty string", "", nil},
+		{"only whitespace", "   ", nil},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := splitCommand(tc.input)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
 func TestResolveEditor(t *testing.T) {
 	t.Run("uses project editor first", func(t *testing.T) {
 		p := catalog.Project{Editor: "true"}
 		editor, err := resolveEditor(p)
 		require.NoError(t, err)
-		assert.Equal(t, "true", editor)
+		assert.Equal(t, []string{"true"}, editor)
+	})
+
+	t.Run("parses editor with arguments", func(t *testing.T) {
+		p := catalog.Project{Editor: "true -v"}
+		editor, err := resolveEditor(p)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"true", "-v"}, editor)
 	})
 
 	t.Run("falls back to EDITOR env var", func(t *testing.T) {
@@ -646,7 +704,7 @@ func TestResolveEditor(t *testing.T) {
 		p := catalog.Project{}
 		editor, err := resolveEditor(p)
 		require.NoError(t, err)
-		assert.Equal(t, "true", editor)
+		assert.Equal(t, []string{"true"}, editor)
 	})
 
 	t.Run("falls back to vim", func(t *testing.T) {
@@ -656,7 +714,7 @@ func TestResolveEditor(t *testing.T) {
 		if err != nil {
 			assert.Contains(t, err.Error(), "not found in PATH")
 		} else {
-			assert.Equal(t, "vim", editor)
+			assert.Equal(t, []string{"vim"}, editor)
 		}
 	})
 
@@ -665,6 +723,13 @@ func TestResolveEditor(t *testing.T) {
 		_, err := resolveEditor(p)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "not found in PATH")
+	})
+
+	t.Run("returns error for empty editor", func(t *testing.T) {
+		t.Setenv("EDITOR", "   ")
+		p := catalog.Project{Editor: "   "}
+		_, err := resolveEditor(p)
+		assert.Error(t, err)
 	})
 }
 
