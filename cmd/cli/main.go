@@ -10,6 +10,12 @@ import (
 	"github.com/alecthomas/kong"
 )
 
+var (
+	Version = "dev"
+	Commit  = "unknown"
+	Date    = "unknown"
+)
+
 type CLI struct {
 	Add        AddCmd        `cmd:"" aliases:"a" help:"Add a project to the catalog"`
 	List       ListCmd       `cmd:"" aliases:"ls" help:"List projects in the catalog"`
@@ -21,7 +27,8 @@ type CLI struct {
 	Init       InitCmd       `cmd:"" help:"Generate shell integration"`
 	Completion CompletionCmd `cmd:"" help:"Generate shell completions"`
 
-	CatalogPath string `name:"catalog" short:"c" help:"Path to catalog file"`
+	CatalogPath string           `name:"catalog" short:"c" help:"Path to catalog file"`
+	Version     kong.VersionFlag `name:"version" short:"v" help:"Print version and exit"`
 }
 
 func (c *CLI) AfterApply(ctx *kong.Context) error {
@@ -53,6 +60,7 @@ func main() {
 		kong.Name("pj"),
 		kong.Description("Project tracker and launcher"),
 		kong.UsageOnError(),
+		kong.Vars{"version": fmt.Sprintf("%s (%s, %s)", Version, Commit, Date)},
 	)
 	err := ctx.Run()
 	ctx.FatalIfErrorf(err)
