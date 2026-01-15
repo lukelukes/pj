@@ -104,7 +104,7 @@ func (r *LipglossRenderer) renderItem(item ProjectListItem, now time.Time, last 
 		lines = append(lines, desc)
 	}
 	if !last {
-		lines = append(lines, "")
+		lines = append(lines, "", "")
 	}
 
 	return strings.Join(lines, "\n")
