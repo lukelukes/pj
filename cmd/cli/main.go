@@ -18,6 +18,7 @@ var (
 
 type CLI struct {
 	Add        AddCmd        `cmd:"" aliases:"a" help:"Add a project to the catalog"`
+	Create     CreateCmd     `cmd:"" aliases:"new" help:"Create a new project interactively"`
 	List       ListCmd       `cmd:"" aliases:"ls" help:"List projects in the catalog"`
 	Rm         RmCmd         `cmd:"" help:"Remove a project from the catalog"`
 	Open       OpenCmd       `cmd:"" aliases:"o" help:"Open project in editor"`
