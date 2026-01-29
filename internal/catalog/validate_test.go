@@ -11,6 +11,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestValidateName(t *testing.T) {
+	t.Run("empty name returns ErrEmptyName", func(t *testing.T) {
+		assert.ErrorIs(t, catalog.ValidateName(""), catalog.ErrEmptyName)
+	})
+
+	t.Run("whitespace-only name returns ErrEmptyName", func(t *testing.T) {
+		assert.ErrorIs(t, catalog.ValidateName("   \t\n  "), catalog.ErrEmptyName)
+	})
+
+	t.Run("valid name returns nil", func(t *testing.T) {
+		assert.NoError(t, catalog.ValidateName("my-project"))
+	})
+}
+
 func TestProject_ValidateAndNormalize(t *testing.T) {
 	tempDir := t.TempDir()
 

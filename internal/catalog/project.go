@@ -48,9 +48,16 @@ func (p *Project) Touch() {
 	p.LastAccessed = time.Now()
 }
 
-func (p *Project) ValidateAndNormalize() error {
-	if strings.TrimSpace(p.Name) == "" {
+func ValidateName(name string) error {
+	if strings.TrimSpace(name) == "" {
 		return ErrEmptyName
+	}
+	return nil
+}
+
+func (p *Project) ValidateAndNormalize() error {
+	if err := ValidateName(p.Name); err != nil {
+		return err
 	}
 
 	if !filepath.IsAbs(p.Path) {
