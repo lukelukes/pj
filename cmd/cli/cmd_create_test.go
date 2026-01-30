@@ -12,12 +12,34 @@ func TestRenderCreateSummary(t *testing.T) {
 	t.Run("shows collapsed name field", func(t *testing.T) {
 		g, out := newTestGlobals(t)
 
-		renderCreateSummary(g, "my-project")
+		renderCreateSummary(g, "my-project", "/home/user/projects")
 
 		output := out.String()
 		assert.Contains(t, output, "◇")
 		assert.Contains(t, output, "Name")
 		assert.Contains(t, output, "my-project")
+	})
+
+	t.Run("shows collapsed location field", func(t *testing.T) {
+		g, out := newTestGlobals(t)
+
+		renderCreateSummary(g, "my-project", "/home/user/projects")
+
+		output := out.String()
+		assert.Contains(t, output, "Location")
+		assert.Contains(t, output, "/home/user/projects")
+	})
+
+	t.Run("shows both name and location fields", func(t *testing.T) {
+		g, out := newTestGlobals(t)
+
+		renderCreateSummary(g, "my-project", "/tmp/dev")
+
+		output := out.String()
+		assert.Contains(t, output, "Name")
+		assert.Contains(t, output, "my-project")
+		assert.Contains(t, output, "Location")
+		assert.Contains(t, output, "/tmp/dev")
 	})
 }
 
