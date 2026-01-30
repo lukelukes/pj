@@ -3,6 +3,7 @@ package ui
 import (
 	"strings"
 
+	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -14,6 +15,14 @@ const (
 	borderSide     = "│"
 	borderBottom   = "└"
 )
+
+func WizardTheme() *huh.Theme {
+	t := huh.ThemeBase()
+	red := lipgloss.Color("1")
+	t.Focused.ErrorMessage = t.Focused.ErrorMessage.SetString("✗").Foreground(red)
+	t.Blurred.ErrorMessage = t.Blurred.ErrorMessage.SetString("✗").Foreground(red)
+	return t
+}
 
 type Field struct {
 	Label    string

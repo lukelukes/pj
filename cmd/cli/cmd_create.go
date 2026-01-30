@@ -30,7 +30,7 @@ func (cmd *CreateCmd) Run(g *Globals) error {
 				Value(&name).
 				Validate(validateCreateName),
 		),
-	)
+	).WithTheme(ui.WizardTheme())
 
 	if err := form.Run(); err != nil {
 		return handleCreateFormError(err)

@@ -13,6 +13,22 @@ func stripANSI(s string) string {
 	return ansiRE.ReplaceAllString(s, "")
 }
 
+func TestWizardTheme(t *testing.T) {
+	t.Run("error message renders with cross prefix", func(t *testing.T) {
+		theme := WizardTheme()
+		rendered := theme.Focused.ErrorMessage.Render("test error")
+		stripped := stripANSI(rendered)
+		assert.Contains(t, stripped, "✗ test error")
+	})
+
+	t.Run("blurred error message renders with cross prefix", func(t *testing.T) {
+		theme := WizardTheme()
+		rendered := theme.Blurred.ErrorMessage.Render("test error")
+		stripped := stripANSI(rendered)
+		assert.Contains(t, stripped, "✗ test error")
+	})
+}
+
 func TestRenderWizard(t *testing.T) {
 	t.Run("completed field renders collapsed with value", func(t *testing.T) {
 		fields := []Field{{Label: "Name", Value: "my-project"}}
