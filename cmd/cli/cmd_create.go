@@ -12,6 +12,14 @@ import (
 
 type CreateCmd struct{}
 
+func validateCreateName(name string) error {
+	err := catalog.ValidateName(name)
+	if errors.Is(err, catalog.ErrEmptyName) {
+		return errors.New("Name cannot be empty")
+	}
+	return err
+}
+
 func (cmd *CreateCmd) Run(g *Globals) error {
 	var name string
 
@@ -20,7 +28,7 @@ func (cmd *CreateCmd) Run(g *Globals) error {
 			huh.NewInput().
 				Title("Name").
 				Value(&name).
-				Validate(catalog.ValidateName),
+				Validate(validateCreateName),
 		),
 	)
 

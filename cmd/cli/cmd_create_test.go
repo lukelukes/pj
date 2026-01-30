@@ -21,6 +21,23 @@ func TestRenderCreateSummary(t *testing.T) {
 	})
 }
 
+func TestValidateCreateName(t *testing.T) {
+	t.Run("empty string returns Name cannot be empty", func(t *testing.T) {
+		err := validateCreateName("")
+		assert.EqualError(t, err, "Name cannot be empty")
+	})
+
+	t.Run("whitespace-only returns Name cannot be empty", func(t *testing.T) {
+		err := validateCreateName("   ")
+		assert.EqualError(t, err, "Name cannot be empty")
+	})
+
+	t.Run("valid name returns nil", func(t *testing.T) {
+		err := validateCreateName("my-project")
+		assert.NoError(t, err)
+	})
+}
+
 func TestHandleCreateFormError(t *testing.T) {
 	t.Run("ErrUserAborted returns nil", func(t *testing.T) {
 		err := handleCreateFormError(huh.ErrUserAborted)
