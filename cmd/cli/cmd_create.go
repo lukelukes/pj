@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"pj/internal/catalog"
 	"pj/internal/ui"
@@ -90,8 +91,15 @@ func (cmd *CreateCmd) Run(g *Globals) error {
 		Git:         gitInit,
 	}
 
-	if _, err := createProjectDir(result.Location, result.Name); err != nil {
+	projectPath, err := createProjectDir(result.Location, result.Name)
+	if err != nil {
 		return err
+	}
+
+	if result.Git {
+		if err := initGitRepo(g, projectPath); err != nil {
+			return err
+		}
 	}
 
 	renderCreateSummary(g, result)
@@ -110,6 +118,18 @@ func createProjectDir(location, name string) (string, error) {
 		return "", fmt.Errorf("creating directory: %w", err)
 	}
 	return projectPath, nil
+}
+
+func initGitRepo(g *Globals, projectPath string) error {
+	if _, err := exec.LookPath("git"); err != nil {
+		fmt.Fprintln(g.Out, "⚠ Git not found, skipping initialization")
+		return nil
+	}
+	cmd := exec.Command("git", "init", projectPath)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("initializing git repository: %w", err)
+	}
+	return nil
 }
 
 func handleCreateFormError(err error) error {

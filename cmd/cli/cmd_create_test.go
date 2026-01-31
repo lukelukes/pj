@@ -165,6 +165,26 @@ func TestCreateProjectDir(t *testing.T) {
 	})
 }
 
+func TestInitGitRepo(t *testing.T) {
+	t.Run("creates .git directory when git is available", func(t *testing.T) {
+		g, _ := newTestGlobals(t)
+		projectPath := t.TempDir()
+
+		err := initGitRepo(g, projectPath)
+
+		require.NoError(t, err)
+		_, statErr := os.Stat(filepath.Join(projectPath, ".git"))
+		assert.NoError(t, statErr)
+	})
+
+	t.Run("git not initialized when git is No", func(t *testing.T) {
+		projectPath := t.TempDir()
+
+		_, statErr := os.Stat(filepath.Join(projectPath, ".git"))
+		assert.True(t, os.IsNotExist(statErr))
+	})
+}
+
 func TestHandleCreateFormError(t *testing.T) {
 	t.Run("ErrUserAborted returns nil", func(t *testing.T) {
 		err := handleCreateFormError(huh.ErrUserAborted)
