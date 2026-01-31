@@ -2,10 +2,13 @@ package main
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/charmbracelet/huh"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRenderCreateSummary(t *testing.T) {
@@ -123,6 +126,42 @@ func TestValidateCreateName(t *testing.T) {
 	t.Run("valid name returns nil", func(t *testing.T) {
 		err := validateCreateName("my-project")
 		assert.NoError(t, err)
+	})
+}
+
+func TestCreateProjectDir(t *testing.T) {
+	t.Run("creates directory at location/name", func(t *testing.T) {
+		location := t.TempDir()
+		projectPath, err := createProjectDir(location, "my-project")
+
+		require.NoError(t, err)
+		assert.Equal(t, filepath.Join(location, "my-project"), projectPath)
+		info, err := os.Stat(projectPath)
+		require.NoError(t, err)
+		assert.True(t, info.IsDir())
+	})
+
+	t.Run("returns error when directory already exists", func(t *testing.T) {
+		location := t.TempDir()
+		require.NoError(t, os.Mkdir(filepath.Join(location, "existing"), 0o755))
+
+		_, err := createProjectDir(location, "existing")
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "Directory already exists")
+		assert.Contains(t, err.Error(), filepath.Join(location, "existing"))
+	})
+
+	t.Run("returns error when path is not writable", func(t *testing.T) {
+		location := t.TempDir()
+		require.NoError(t, os.Chmod(location, 0o555))
+		t.Cleanup(func() { os.Chmod(location, 0o755) })
+
+		_, err := createProjectDir(location, "blocked")
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "Permission denied")
+		assert.Contains(t, err.Error(), filepath.Join(location, "blocked"))
 	})
 }
 

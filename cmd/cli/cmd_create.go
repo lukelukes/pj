@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"pj/internal/catalog"
 	"pj/internal/ui"
 	"strings"
@@ -88,8 +89,27 @@ func (cmd *CreateCmd) Run(g *Globals) error {
 		Editor:      strings.TrimSpace(editor),
 		Git:         gitInit,
 	}
+
+	if _, err := createProjectDir(result.Location, result.Name); err != nil {
+		return err
+	}
+
 	renderCreateSummary(g, result)
 	return nil
+}
+
+func createProjectDir(location, name string) (string, error) {
+	projectPath := filepath.Join(location, name)
+	if _, err := os.Stat(projectPath); err == nil {
+		return "", fmt.Errorf("Directory already exists: %s", projectPath)
+	}
+	if err := os.Mkdir(projectPath, 0o755); err != nil {
+		if errors.Is(err, os.ErrPermission) {
+			return "", fmt.Errorf("Permission denied: %s", projectPath)
+		}
+		return "", fmt.Errorf("creating directory: %w", err)
+	}
+	return projectPath, nil
 }
 
 func handleCreateFormError(err error) error {
