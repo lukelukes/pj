@@ -61,6 +61,26 @@ func TestRenderCreateSummary(t *testing.T) {
 		output := out.String()
 		assert.NotContains(t, output, "Description")
 	})
+
+	t.Run("shows collapsed editor field", func(t *testing.T) {
+		g, out := newTestGlobals(t)
+
+		renderCreateSummary(g, createResult{Name: "my-project", Location: "/tmp/dev", Editor: "vim"})
+
+		output := out.String()
+		assert.Contains(t, output, "◇")
+		assert.Contains(t, output, "Editor")
+		assert.Contains(t, output, "vim")
+	})
+
+	t.Run("omits empty editor from output", func(t *testing.T) {
+		g, out := newTestGlobals(t)
+
+		renderCreateSummary(g, createResult{Name: "my-project", Location: "/tmp/dev", Editor: ""})
+
+		output := out.String()
+		assert.NotContains(t, output, "Editor")
+	})
 }
 
 func TestValidateCreateName(t *testing.T) {

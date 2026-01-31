@@ -17,6 +17,7 @@ type createResult struct {
 	Name        string
 	Location    string
 	Description string
+	Editor      string
 }
 
 func validateCreateName(name string) error {
@@ -30,6 +31,7 @@ func validateCreateName(name string) error {
 func (cmd *CreateCmd) Run(g *Globals) error {
 	var name string
 	var description string
+	var editor string
 
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -56,6 +58,12 @@ func (cmd *CreateCmd) Run(g *Globals) error {
 				Placeholder("Press Enter to skip").
 				Value(&description),
 		),
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Editor (optional)").
+				Placeholder("Press Enter to skip").
+				Value(&editor),
+		),
 	).WithTheme(ui.WizardTheme())
 
 	if err := form.Run(); err != nil {
@@ -66,6 +74,7 @@ func (cmd *CreateCmd) Run(g *Globals) error {
 		Name:        strings.TrimSpace(name),
 		Location:    strings.TrimSpace(location),
 		Description: strings.TrimSpace(description),
+		Editor:      strings.TrimSpace(editor),
 	}
 	renderCreateSummary(g, result)
 	return nil
@@ -83,6 +92,7 @@ func renderCreateSummary(g *Globals, r createResult) {
 		{Label: "Name", Value: r.Name},
 		{Label: "Location", Value: r.Location},
 		{Label: "Description", Value: r.Description, Optional: true},
+		{Label: "Editor", Value: r.Editor, Optional: true},
 	}
 	output := ui.RenderWizard("Create new project", fields, -1)
 	fmt.Fprint(g.Out, output)
