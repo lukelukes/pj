@@ -18,6 +18,7 @@ type createResult struct {
 	Location    string
 	Description string
 	Editor      string
+	Git         bool
 }
 
 func validateCreateName(name string) error {
@@ -32,6 +33,7 @@ func (cmd *CreateCmd) Run(g *Globals) error {
 	var name string
 	var description string
 	var editor string
+	gitInit := true
 
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -64,6 +66,15 @@ func (cmd *CreateCmd) Run(g *Globals) error {
 				Placeholder("Press Enter to skip").
 				Value(&editor),
 		),
+		huh.NewGroup(
+			huh.NewSelect[bool]().
+				Title("Initialize git repository?").
+				Options(
+					huh.NewOption("Yes (recommended)", true).Selected(true),
+					huh.NewOption("No", false),
+				).
+				Value(&gitInit),
+		),
 	).WithTheme(ui.WizardTheme())
 
 	if err := form.Run(); err != nil {
@@ -75,6 +86,7 @@ func (cmd *CreateCmd) Run(g *Globals) error {
 		Location:    strings.TrimSpace(location),
 		Description: strings.TrimSpace(description),
 		Editor:      strings.TrimSpace(editor),
+		Git:         gitInit,
 	}
 	renderCreateSummary(g, result)
 	return nil
@@ -87,12 +99,20 @@ func handleCreateFormError(err error) error {
 	return err
 }
 
+func gitLabel(v bool) string {
+	if v {
+		return "Yes"
+	}
+	return "No"
+}
+
 func renderCreateSummary(g *Globals, r createResult) {
 	fields := []ui.Field{
 		{Label: "Name", Value: r.Name},
 		{Label: "Location", Value: r.Location},
 		{Label: "Description", Value: r.Description, Optional: true},
 		{Label: "Editor", Value: r.Editor, Optional: true},
+		{Label: "Git", Value: gitLabel(r.Git)},
 	}
 	output := ui.RenderWizard("Create new project", fields, -1)
 	fmt.Fprint(g.Out, output)

@@ -81,6 +81,32 @@ func TestRenderCreateSummary(t *testing.T) {
 		output := out.String()
 		assert.NotContains(t, output, "Editor")
 	})
+
+	t.Run("shows git yes when enabled", func(t *testing.T) {
+		g, out := newTestGlobals(t)
+
+		renderCreateSummary(g, createResult{Name: "my-project", Location: "/tmp/dev", Git: true})
+
+		output := out.String()
+		assert.Contains(t, output, "◇")
+		assert.Contains(t, output, "Git")
+		assert.Contains(t, output, "Yes")
+	})
+
+	t.Run("shows git no when disabled", func(t *testing.T) {
+		g, out := newTestGlobals(t)
+
+		renderCreateSummary(g, createResult{Name: "my-project", Location: "/tmp/dev", Git: false})
+
+		output := out.String()
+		assert.Contains(t, output, "Git")
+		assert.Contains(t, output, "No")
+	})
+}
+
+func TestGitLabel(t *testing.T) {
+	assert.Equal(t, "Yes", gitLabel(true))
+	assert.Equal(t, "No", gitLabel(false))
 }
 
 func TestValidateCreateName(t *testing.T) {
