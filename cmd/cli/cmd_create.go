@@ -102,6 +102,10 @@ func (cmd *CreateCmd) Run(g *Globals) error {
 		}
 	}
 
+	if err := registerProject(g, result, projectPath); err != nil {
+		return err
+	}
+
 	renderCreateSummary(g, result)
 	return nil
 }
@@ -150,6 +154,19 @@ func createGitignore(projectPath string) error {
 		"",
 	}, "\n")
 	return os.WriteFile(filepath.Join(projectPath, ".gitignore"), []byte(content), 0o644)
+}
+
+func registerProject(g *Globals, result createResult, projectPath string) error {
+	p := catalog.NewProject(result.Name, projectPath).
+		WithDescription(result.Description).
+		WithEditor(result.Editor)
+	if err := g.Cat.Add(p); err != nil {
+		return fmt.Errorf("adding project to catalog: %w", err)
+	}
+	if err := g.Cat.Save(); err != nil {
+		return fmt.Errorf("saving catalog: %w", err)
+	}
+	return nil
 }
 
 func handleCreateFormError(err error) error {

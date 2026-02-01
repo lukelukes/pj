@@ -254,6 +254,83 @@ func TestInitGitRepoCreatesGitignore(t *testing.T) {
 	assert.NoError(t, statErr)
 }
 
+func TestRegisterProject(t *testing.T) {
+	t.Run("adds project to catalog with correct name and path", func(t *testing.T) {
+		g, _ := newTestGlobals(t)
+		projectPath := t.TempDir()
+
+		err := registerProject(g, createResult{
+			Name:     "my-project",
+			Location: filepath.Dir(projectPath),
+		}, projectPath)
+
+		require.NoError(t, err)
+		assert.Equal(t, 1, g.Cat.Count())
+		projects := g.Cat.List()
+		assert.Equal(t, "my-project", projects[0].Name)
+		assert.Equal(t, projectPath, projects[0].Path)
+	})
+
+	t.Run("stores description when provided", func(t *testing.T) {
+		g, _ := newTestGlobals(t)
+		projectPath := t.TempDir()
+
+		err := registerProject(g, createResult{
+			Name:        "my-project",
+			Location:    filepath.Dir(projectPath),
+			Description: "A cool project",
+		}, projectPath)
+
+		require.NoError(t, err)
+		projects := g.Cat.List()
+		assert.Equal(t, "A cool project", projects[0].Description)
+	})
+
+	t.Run("stores editor when provided", func(t *testing.T) {
+		g, _ := newTestGlobals(t)
+		projectPath := t.TempDir()
+
+		err := registerProject(g, createResult{
+			Name:     "my-project",
+			Location: filepath.Dir(projectPath),
+			Editor:   "nvim",
+		}, projectPath)
+
+		require.NoError(t, err)
+		projects := g.Cat.List()
+		assert.Equal(t, "nvim", projects[0].Editor)
+	})
+
+	t.Run("empty description and editor stored as empty", func(t *testing.T) {
+		g, _ := newTestGlobals(t)
+		projectPath := t.TempDir()
+
+		err := registerProject(g, createResult{
+			Name:     "my-project",
+			Location: filepath.Dir(projectPath),
+		}, projectPath)
+
+		require.NoError(t, err)
+		projects := g.Cat.List()
+		assert.Empty(t, projects[0].Description)
+		assert.Empty(t, projects[0].Editor)
+	})
+
+	t.Run("persists to catalog file", func(t *testing.T) {
+		g, _ := newTestGlobals(t)
+		projectPath := t.TempDir()
+
+		err := registerProject(g, createResult{
+			Name:     "my-project",
+			Location: filepath.Dir(projectPath),
+		}, projectPath)
+
+		require.NoError(t, err)
+		require.NoError(t, g.Cat.Load())
+		assert.Equal(t, 1, g.Cat.Count())
+	})
+}
+
 func TestHandleCreateFormError(t *testing.T) {
 	t.Run("ErrUserAborted returns nil", func(t *testing.T) {
 		err := handleCreateFormError(huh.ErrUserAborted)

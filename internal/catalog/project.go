@@ -44,6 +44,12 @@ func (p Project) WithDescription(description string) Project {
 	return newP
 }
 
+func (p Project) WithEditor(editor string) Project {
+	newP := p
+	newP.Editor = editor
+	return newP
+}
+
 func (p *Project) Touch() {
 	p.LastAccessed = time.Now()
 }
