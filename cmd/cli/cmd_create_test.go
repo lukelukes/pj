@@ -185,6 +185,75 @@ func TestInitGitRepo(t *testing.T) {
 	})
 }
 
+func TestCreateGitignore(t *testing.T) {
+	t.Run("creates .gitignore file", func(t *testing.T) {
+		projectPath := t.TempDir()
+
+		err := createGitignore(projectPath)
+
+		require.NoError(t, err)
+		_, statErr := os.Stat(filepath.Join(projectPath, ".gitignore"))
+		assert.NoError(t, statErr)
+	})
+
+	t.Run("contains OS patterns", func(t *testing.T) {
+		projectPath := t.TempDir()
+		require.NoError(t, createGitignore(projectPath))
+
+		content, err := os.ReadFile(filepath.Join(projectPath, ".gitignore"))
+		require.NoError(t, err)
+
+		assert.Contains(t, string(content), ".DS_Store")
+		assert.Contains(t, string(content), "Thumbs.db")
+	})
+
+	t.Run("contains editor patterns", func(t *testing.T) {
+		projectPath := t.TempDir()
+		require.NoError(t, createGitignore(projectPath))
+
+		content, err := os.ReadFile(filepath.Join(projectPath, ".gitignore"))
+		require.NoError(t, err)
+
+		assert.Contains(t, string(content), ".idea/")
+		assert.Contains(t, string(content), ".vscode/")
+		assert.Contains(t, string(content), "*.swp")
+	})
+
+	t.Run("contains build patterns", func(t *testing.T) {
+		projectPath := t.TempDir()
+		require.NoError(t, createGitignore(projectPath))
+
+		content, err := os.ReadFile(filepath.Join(projectPath, ".gitignore"))
+		require.NoError(t, err)
+
+		assert.Contains(t, string(content), "/dist/")
+		assert.Contains(t, string(content), "/build/")
+		assert.Contains(t, string(content), "/out/")
+	})
+
+	t.Run("contains dependency patterns", func(t *testing.T) {
+		projectPath := t.TempDir()
+		require.NoError(t, createGitignore(projectPath))
+
+		content, err := os.ReadFile(filepath.Join(projectPath, ".gitignore"))
+		require.NoError(t, err)
+
+		assert.Contains(t, string(content), "/vendor/")
+		assert.Contains(t, string(content), "/node_modules/")
+	})
+}
+
+func TestInitGitRepoCreatesGitignore(t *testing.T) {
+	g, _ := newTestGlobals(t)
+	projectPath := t.TempDir()
+
+	err := initGitRepo(g, projectPath)
+
+	require.NoError(t, err)
+	_, statErr := os.Stat(filepath.Join(projectPath, ".gitignore"))
+	assert.NoError(t, statErr)
+}
+
 func TestHandleCreateFormError(t *testing.T) {
 	t.Run("ErrUserAborted returns nil", func(t *testing.T) {
 		err := handleCreateFormError(huh.ErrUserAborted)

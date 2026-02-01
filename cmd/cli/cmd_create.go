@@ -129,7 +129,27 @@ func initGitRepo(g *Globals, projectPath string) error {
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("initializing git repository: %w", err)
 	}
-	return nil
+	return createGitignore(projectPath)
+}
+
+func createGitignore(projectPath string) error {
+	content := strings.Join([]string{
+		".DS_Store",
+		"Thumbs.db",
+		"",
+		".idea/",
+		".vscode/",
+		"*.swp",
+		"",
+		"/dist/",
+		"/build/",
+		"/out/",
+		"",
+		"/vendor/",
+		"/node_modules/",
+		"",
+	}, "\n")
+	return os.WriteFile(filepath.Join(projectPath, ".gitignore"), []byte(content), 0o644)
 }
 
 func handleCreateFormError(err error) error {
