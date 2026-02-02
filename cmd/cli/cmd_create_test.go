@@ -12,98 +12,58 @@ import (
 )
 
 func TestRenderCreateSummary(t *testing.T) {
-	t.Run("shows collapsed name field", func(t *testing.T) {
+	t.Run("shows created header with project name", func(t *testing.T) {
 		g, out := newTestGlobals(t)
 
 		renderCreateSummary(g, createResult{Name: "my-project", Location: "/home/user/projects"})
 
 		output := out.String()
-		assert.Contains(t, output, "◇")
-		assert.Contains(t, output, "Name")
-		assert.Contains(t, output, "my-project")
+		assert.Contains(t, output, "◆ Created my-project")
 	})
 
-	t.Run("shows collapsed location field", func(t *testing.T) {
+	t.Run("shows full path on its own line", func(t *testing.T) {
 		g, out := newTestGlobals(t)
 
 		renderCreateSummary(g, createResult{Name: "my-project", Location: "/home/user/projects"})
 
 		output := out.String()
-		assert.Contains(t, output, "Location")
-		assert.Contains(t, output, "/home/user/projects")
+		assert.Contains(t, output, "/home/user/projects/my-project")
 	})
 
-	t.Run("shows both name and location fields", func(t *testing.T) {
+	t.Run("shows directory created checkmark", func(t *testing.T) {
 		g, out := newTestGlobals(t)
 
 		renderCreateSummary(g, createResult{Name: "my-project", Location: "/tmp/dev"})
 
 		output := out.String()
-		assert.Contains(t, output, "Name")
-		assert.Contains(t, output, "my-project")
-		assert.Contains(t, output, "Location")
-		assert.Contains(t, output, "/tmp/dev")
+		assert.Contains(t, output, "✓ Directory created")
 	})
 
-	t.Run("shows collapsed description field", func(t *testing.T) {
-		g, out := newTestGlobals(t)
-
-		renderCreateSummary(g, createResult{Name: "my-project", Location: "/tmp/dev", Description: "A cool project"})
-
-		output := out.String()
-		assert.Contains(t, output, "◇")
-		assert.Contains(t, output, "Description")
-		assert.Contains(t, output, "A cool project")
-	})
-
-	t.Run("omits empty description from output", func(t *testing.T) {
-		g, out := newTestGlobals(t)
-
-		renderCreateSummary(g, createResult{Name: "my-project", Location: "/tmp/dev", Description: ""})
-
-		output := out.String()
-		assert.NotContains(t, output, "Description")
-	})
-
-	t.Run("shows collapsed editor field", func(t *testing.T) {
-		g, out := newTestGlobals(t)
-
-		renderCreateSummary(g, createResult{Name: "my-project", Location: "/tmp/dev", Editor: "vim"})
-
-		output := out.String()
-		assert.Contains(t, output, "◇")
-		assert.Contains(t, output, "Editor")
-		assert.Contains(t, output, "vim")
-	})
-
-	t.Run("omits empty editor from output", func(t *testing.T) {
-		g, out := newTestGlobals(t)
-
-		renderCreateSummary(g, createResult{Name: "my-project", Location: "/tmp/dev", Editor: ""})
-
-		output := out.String()
-		assert.NotContains(t, output, "Editor")
-	})
-
-	t.Run("shows git yes when enabled", func(t *testing.T) {
+	t.Run("shows git initialized when git enabled", func(t *testing.T) {
 		g, out := newTestGlobals(t)
 
 		renderCreateSummary(g, createResult{Name: "my-project", Location: "/tmp/dev", Git: true})
 
 		output := out.String()
-		assert.Contains(t, output, "◇")
-		assert.Contains(t, output, "Git")
-		assert.Contains(t, output, "Yes")
+		assert.Contains(t, output, "✓ Git initialized")
 	})
 
-	t.Run("shows git no when disabled", func(t *testing.T) {
+	t.Run("does not show git initialized when git disabled", func(t *testing.T) {
 		g, out := newTestGlobals(t)
 
 		renderCreateSummary(g, createResult{Name: "my-project", Location: "/tmp/dev", Git: false})
 
 		output := out.String()
-		assert.Contains(t, output, "Git")
-		assert.Contains(t, output, "No")
+		assert.NotContains(t, output, "Git initialized")
+	})
+
+	t.Run("shows added to catalog checkmark", func(t *testing.T) {
+		g, out := newTestGlobals(t)
+
+		renderCreateSummary(g, createResult{Name: "my-project", Location: "/tmp/dev"})
+
+		output := out.String()
+		assert.Contains(t, output, "✓ Added to catalog")
 	})
 }
 

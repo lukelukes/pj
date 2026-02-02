@@ -14,6 +14,7 @@ const (
 	borderTop      = "┌"
 	borderSide     = "│"
 	borderBottom   = "└"
+	checkSymbol    = "✓"
 )
 
 func WizardTheme() *huh.Theme {
@@ -57,6 +58,41 @@ func RenderWizard(title string, fields []Field, activeIdx int) string {
 
 	if activeIdx >= 0 && activeIdx < len(fields) {
 		b.WriteString(border.Render(borderSide))
+		b.WriteString("\n")
+	}
+
+	b.WriteString(border.Render(borderBottom))
+	b.WriteString("\n")
+
+	return b.String()
+}
+
+func RenderSuccess(name, path string, checks []string) string {
+	var b strings.Builder
+
+	border := borderStyle()
+
+	b.WriteString(border.Render(borderTop))
+	b.WriteString(" ")
+	b.WriteString(activeSymbol)
+	b.WriteString(" Created ")
+	b.WriteString(name)
+	b.WriteString("\n")
+
+	b.WriteString(border.Render(borderSide))
+	b.WriteString(" ")
+	b.WriteString(path)
+	b.WriteString("\n")
+
+	b.WriteString(border.Render(borderSide))
+	b.WriteString("\n")
+
+	for _, check := range checks {
+		b.WriteString(border.Render(borderSide))
+		b.WriteString(" ")
+		b.WriteString(checkSymbol)
+		b.WriteString(" ")
+		b.WriteString(check)
 		b.WriteString("\n")
 	}
 

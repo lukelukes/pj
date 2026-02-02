@@ -184,13 +184,12 @@ func gitLabel(v bool) string {
 }
 
 func renderCreateSummary(g *Globals, r createResult) {
-	fields := []ui.Field{
-		{Label: "Name", Value: r.Name},
-		{Label: "Location", Value: r.Location},
-		{Label: "Description", Value: r.Description, Optional: true},
-		{Label: "Editor", Value: r.Editor, Optional: true},
-		{Label: "Git", Value: gitLabel(r.Git)},
+	projectPath := filepath.Join(r.Location, r.Name)
+	checks := []string{"Directory created"}
+	if r.Git {
+		checks = append(checks, "Git initialized")
 	}
-	output := ui.RenderWizard("Create new project", fields, -1)
+	checks = append(checks, "Added to catalog")
+	output := ui.RenderSuccess(r.Name, projectPath, checks)
 	fmt.Fprint(g.Out, output)
 }
