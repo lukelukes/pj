@@ -1,3 +1,9 @@
+MAKEFLAGS += --warn-undefined-variables
+SHELL := bash
+.SHELLFLAGS := -eu -o pipefail -c
+.DELETE_ON_ERROR:
+.SUFFIXES:
+
 BUILD_DIR := out
 BINARY := $(BUILD_DIR)/pj
 PKG := ./cmd/cli
@@ -22,7 +28,7 @@ $(BUILD_DIR):
 
 ##@ Build
 build: | $(BUILD_DIR) ## Build the binary
-	go build -trimpath $(LDFLAGS) -o $(BINARY) $(PKG)
+	CGO_ENABLED=0 go build -trimpath $(LDFLAGS) -o $(BINARY) $(PKG)
 
 ##@ Test
 test: ## Run unit tests
@@ -96,12 +102,15 @@ vuln: ## Run govulncheck ./... (Go vulnerability scanner)
 tidy: ## Run go mod tidy -v
 	@go mod tidy -v
 
+mod-verify: ## Verify dependencies haven't been tampered with
+	@go mod verify
+
 verify-dev: build ## Run all quality checks - in local dev
-	@$(MAKE) -j4 lint fmt-check vet vuln tidy
+	@$(MAKE) -j4 lint fmt-check vet vuln tidy mod-verify
 	@$(MAKE) test-all
 
 verify-ci: build ## Run all quality checks - in CI
-	@$(MAKE) -j4 vet vuln tidy
+	@$(MAKE) -j4 vet vuln tidy mod-verify
 	@$(MAKE) test-all
 
 ##@ Release
