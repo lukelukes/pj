@@ -14,6 +14,7 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev
 COMMIT  := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 DATE    := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS := -ldflags "-s -w -X main.Version=$(VERSION) -X main.Commit=$(COMMIT) -X main.Date=$(DATE)"
+TESTFLAGS ?=
 
 .PHONY: all
 all: build
@@ -31,11 +32,11 @@ build: | $(BUILD_DIR) ## Build the binary
 
 .PHONY: test
 test: ## Run unit tests
-	go test -race ./internal/... ./cmd/...
+	go test -race $(TESTFLAGS) ./internal/... ./cmd/...
 
 .PHONY: test-property
 test-property: ## Run property-based tests (100 iterations)
-	go test -race ./proptest -run Property
+	go test -race $(TESTFLAGS) ./proptest -run Property
 
 .PHONY: test-property-deep
 test-property-deep: ## Run property-based tests (10000 iterations, finds rare bugs)
@@ -150,7 +151,7 @@ verify-dev: build ## Run all quality checks - in local dev
 .PHONY: verify-ci
 verify-ci: build ## Run all quality checks - in CI
 	@$(MAKE) -j4 vet vuln tidy-check mod-verify
-	@$(MAKE) test-all
+	@$(MAKE) test-all TESTFLAGS="-count=1"
 
 ##@ Release
 
