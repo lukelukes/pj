@@ -19,7 +19,6 @@ pj() {
                 echo "Usage: pj cd <project>" >&2
                 return 1
             fi
-            # Capture both stdout and exit code - propagate real errors
             dir="$(command pj show "$2" --path 2>&1)"
             if [ $? -ne 0 ]; then
                 echo "pj: $dir" >&2
@@ -30,6 +29,17 @@ pj() {
                 return 1
             fi
             builtin cd -- "$dir"
+            ;;
+        create|new)
+            local cdfile
+            cdfile="$(mktemp "${TMPDIR:-/tmp}/pj-cd.XXXXXX")"
+            __PJ_CD_FILE="$cdfile" command pj create "${@:2}"
+            local rc=$?
+            if [ $rc -eq 0 ] && [ -s "$cdfile" ]; then
+                builtin cd -- "$(cat "$cdfile")"
+            fi
+            rm -f "$cdfile"
+            return $rc
             ;;
         *)
             command pj "$@"

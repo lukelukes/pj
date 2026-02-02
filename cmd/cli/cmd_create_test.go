@@ -291,6 +291,30 @@ func TestRegisterProject(t *testing.T) {
 	})
 }
 
+func TestPrintCdHint(t *testing.T) {
+	t.Run("writes path to cd file when env set", func(t *testing.T) {
+		g, out := newTestGlobals(t)
+		cdFile := filepath.Join(t.TempDir(), "cd-target")
+		t.Setenv("__PJ_CD_FILE", cdFile)
+
+		printCdHint(g, "/home/user/projects/my-project")
+
+		content, err := os.ReadFile(cdFile)
+		require.NoError(t, err)
+		assert.Equal(t, "/home/user/projects/my-project", string(content))
+		assert.Empty(t, out.String())
+	})
+
+	t.Run("prints cd command when env not set", func(t *testing.T) {
+		g, out := newTestGlobals(t)
+		t.Setenv("__PJ_CD_FILE", "")
+
+		printCdHint(g, "/home/user/projects/my-project")
+
+		assert.Contains(t, out.String(), "cd /home/user/projects/my-project")
+	})
+}
+
 func TestHandleCreateFormError(t *testing.T) {
 	t.Run("ErrUserAborted returns nil", func(t *testing.T) {
 		err := handleCreateFormError(huh.ErrUserAborted)

@@ -107,6 +107,7 @@ func (cmd *CreateCmd) Run(g *Globals) error {
 	}
 
 	renderCreateSummary(g, result)
+	printCdHint(g, projectPath)
 	return nil
 }
 
@@ -192,4 +193,14 @@ func renderCreateSummary(g *Globals, r createResult) {
 	checks = append(checks, "Added to catalog")
 	output := ui.RenderSuccess(r.Name, projectPath, checks)
 	fmt.Fprint(g.Out, output)
+}
+
+func printCdHint(g *Globals, projectPath string) {
+	cdFile := os.Getenv("__PJ_CD_FILE")
+	if cdFile != "" {
+		if err := os.WriteFile(cdFile, []byte(projectPath), 0o600); err == nil {
+			return
+		}
+	}
+	fmt.Fprintf(g.Out, "\nRun: cd %s\n", projectPath)
 }
