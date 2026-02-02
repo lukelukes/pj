@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"pj/internal/catalog"
 	"testing"
 
 	"github.com/charmbracelet/huh"
@@ -324,5 +325,56 @@ func TestHandleCreateFormError(t *testing.T) {
 	t.Run("other errors propagate", func(t *testing.T) {
 		err := handleCreateFormError(errors.New("unexpected"))
 		assert.Error(t, err)
+	})
+}
+
+func TestExecuteCreateCleansUpOnError(t *testing.T) {
+	t.Run("removes directory when catalog add fails", func(t *testing.T) {
+		g, _ := newTestGlobals(t)
+		location := t.TempDir()
+		projectPath := filepath.Join(location, "doomed")
+		require.NoError(t, os.Mkdir(projectPath, 0o755))
+		require.NoError(t, g.Cat.Add(catalog.NewProject("doomed", projectPath)))
+		require.NoError(t, os.Remove(projectPath))
+
+		err := executeCreate(g, createResult{
+			Name:     "doomed",
+			Location: location,
+		})
+
+		require.Error(t, err)
+		_, statErr := os.Stat(projectPath)
+		assert.True(t, os.IsNotExist(statErr), "directory should be removed on failure")
+	})
+
+	t.Run("catalog unchanged when directory creation fails", func(t *testing.T) {
+		g, _ := newTestGlobals(t)
+		location := t.TempDir()
+		require.NoError(t, os.Mkdir(filepath.Join(location, "existing"), 0o755))
+
+		err := executeCreate(g, createResult{
+			Name:     "existing",
+			Location: location,
+		})
+
+		require.Error(t, err)
+		assert.Equal(t, 0, g.Cat.Count())
+	})
+
+	t.Run("directory preserved on success", func(t *testing.T) {
+		g, _ := newTestGlobals(t)
+		location := t.TempDir()
+		t.Setenv("__PJ_CD_FILE", "")
+
+		err := executeCreate(g, createResult{
+			Name:     "keeper",
+			Location: location,
+		})
+
+		require.NoError(t, err)
+		projectPath := filepath.Join(location, "keeper")
+		info, statErr := os.Stat(projectPath)
+		require.NoError(t, statErr)
+		assert.True(t, info.IsDir())
 	})
 }

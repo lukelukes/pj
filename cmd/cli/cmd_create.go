@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"pj/internal/catalog"
 	"pj/internal/ui"
@@ -91,10 +92,32 @@ func (cmd *CreateCmd) Run(g *Globals) error {
 		Git:         gitInit,
 	}
 
+	return executeCreate(g, result)
+}
+
+func executeCreate(g *Globals, result createResult) error {
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt)
+	defer signal.Stop(sigCh)
+
 	projectPath, err := createProjectDir(result.Location, result.Name)
 	if err != nil {
 		return err
 	}
+
+	completed := false
+	defer func() {
+		if !completed {
+			os.RemoveAll(projectPath)
+		}
+	}()
+
+	go func() {
+		if _, ok := <-sigCh; ok {
+			os.RemoveAll(projectPath)
+			os.Exit(130)
+		}
+	}()
 
 	if result.Git {
 		if err := initGitRepo(g, projectPath); err != nil {
@@ -106,6 +129,7 @@ func (cmd *CreateCmd) Run(g *Globals) error {
 		return err
 	}
 
+	completed = true
 	renderCreateSummary(g, result)
 	printCdHint(g, projectPath)
 	return nil
