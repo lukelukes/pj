@@ -176,7 +176,7 @@ release: confirm no-dirty ## Create a release (requires GITHUB_TOKEN)
 .PHONY: init-toolchain
 init-toolchain: ## Installs all mise managed tools
 	mise install
-	lefthook install
+	make install-hooks
 
 .PHONY: upgrade-deps
 upgrade-deps: ## Upgrades to the latest dependencies
