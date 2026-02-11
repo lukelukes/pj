@@ -19,12 +19,12 @@ func TestDefaultCatalogPath(t *testing.T) {
 	}{
 		{
 			name:        "respects XDG_DATA_HOME when set",
-			xdgDataHome: ptr("/custom/data"),
+			xdgDataHome: new("/custom/data"),
 			expected:    "/custom/data/pj/catalog.yaml",
 		},
 		{
 			name:        "falls back to ~/.local/share when XDG_DATA_HOME is empty",
-			xdgDataHome: ptr(""),
+			xdgDataHome: new(""),
 			expected:    "~/.local/share/pj/catalog.yaml",
 		},
 		{
@@ -34,12 +34,12 @@ func TestDefaultCatalogPath(t *testing.T) {
 		},
 		{
 			name:        "handles XDG_DATA_HOME with trailing slash",
-			xdgDataHome: ptr("/custom/data/"),
+			xdgDataHome: new("/custom/data/"),
 			expected:    "/custom/data/pj/catalog.yaml",
 		},
 		{
 			name:        "handles relative XDG_DATA_HOME path",
-			xdgDataHome: ptr("relative/path"),
+			xdgDataHome: new("relative/path"),
 			expected:    "relative/path/pj/catalog.yaml",
 		},
 	}
@@ -75,10 +75,6 @@ func TestDefaultCatalogPath(t *testing.T) {
 
 		assert.Equal(t, ".local/share/pj/catalog.yaml", got)
 	})
-}
-
-func ptr(s string) *string {
-	return &s
 }
 
 func expandTilde(path, home string) string {

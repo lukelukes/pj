@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 
@@ -185,36 +185,35 @@ func sortProjects(projects []Project, by SortField, descending bool) {
 		by = SortByName
 	}
 
-	sort.SliceStable(projects, func(i, j int) bool {
-		less := compareProjects(projects[i], projects[j], by)
+	slices.SortStableFunc(projects, func(a, b Project) int {
+		c := compareProjects(a, b, by)
 		if descending {
-			return !less
+			return -c
 		}
-		return less
+		return c
 	})
 }
 
-func compareProjects(a, b Project, by SortField) bool {
-	var less, equal bool
-
+func compareProjects(a, b Project, by SortField) int {
 	switch by {
 	case SortByPath:
-		less, equal = a.Path < b.Path, a.Path == b.Path
+		if c := strings.Compare(a.Path, b.Path); c != 0 {
+			return c
+		}
 	case SortByLastAccessed:
-		less = a.LastAccessed.Before(b.LastAccessed)
-		equal = a.LastAccessed.Equal(b.LastAccessed)
+		if c := a.LastAccessed.Compare(b.LastAccessed); c != 0 {
+			return c
+		}
 	case SortByAddedAt:
-		less = a.AddedAt.Before(b.AddedAt)
-		equal = a.AddedAt.Equal(b.AddedAt)
+		if c := a.AddedAt.Compare(b.AddedAt); c != 0 {
+			return c
+		}
 	default:
-		n1, n2 := strings.ToLower(a.Name), strings.ToLower(b.Name)
-		less, equal = n1 < n2, n1 == n2
+		if c := strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)); c != 0 {
+			return c
+		}
 	}
-
-	if equal {
-		return a.ID < b.ID
-	}
-	return less
+	return strings.Compare(a.ID, b.ID)
 }
 
 func (c *YAMLCatalog) Count() int {
@@ -236,8 +235,8 @@ func (c *YAMLCatalog) Save() error {
 		file.Projects = append(file.Projects, p)
 	}
 
-	sort.SliceStable(file.Projects, func(i, j int) bool {
-		return file.Projects[i].Name < file.Projects[j].Name
+	slices.SortStableFunc(file.Projects, func(a, b Project) int {
+		return strings.Compare(a.Name, b.Name)
 	})
 
 	data, err := yaml.Marshal(file)

@@ -2,7 +2,7 @@ package proptest
 
 import (
 	"pj/internal/catalog"
-	"sort"
+	"slices"
 
 	"pgregory.net/rapid"
 )
@@ -61,7 +61,7 @@ func (s *StateTracker) IDs() []string {
 	for id := range s.idToPath {
 		ids = append(ids, id)
 	}
-	sort.Strings(ids)
+	slices.Sort(ids)
 	return ids
 }
 
