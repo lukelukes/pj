@@ -78,7 +78,9 @@ linters:
         - name: var-declaration
         - name: unnecessary-if
         - name: inefficient-map-lookup
+        - name: epoch-naming
         - name: forbidden-call-in-wg-go
+        - name: use-slices-sort
         - name: var-naming
           arguments:
             - []

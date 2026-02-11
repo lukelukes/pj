@@ -8,7 +8,6 @@ BUILD_DIR := out
 BINARY := $(BUILD_DIR)/pj
 PKG := ./cmd/cli
 COVER_OUT := $(BUILD_DIR)/coverage.out
-GOBIN := $(shell go env GOPATH)/bin
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 COMMIT  := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
@@ -107,6 +106,10 @@ mutation-report: | $(BUILD_DIR) ## Generate JSON mutation report
 install-hooks: ## Installs lefthook git hooks
 	lefthook install
 
+.PHONY: fix
+fix: ## Apply go fix modernizers
+	@go fix ./...
+
 .PHONY: lint
 lint: ## Run golangci-lint per .golangci.yml
 	@golangci-lint run
@@ -129,7 +132,7 @@ vet: ## Run go vet
 
 .PHONY: vuln
 vuln: ## Run govulncheck ./... (Go vulnerability scanner)
-	@$(GOBIN)/govulncheck ./...
+	@govulncheck ./...
 
 .PHONY: tidy
 tidy: ## Run go mod tidy -v

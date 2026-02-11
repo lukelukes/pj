@@ -27,8 +27,7 @@ func (e *AmbiguousMatchError) WriteMatches(w io.Writer) {
 }
 
 func handleFindError(w io.Writer, err error) bool {
-	var ambErr *AmbiguousMatchError
-	if errors.As(err, &ambErr) {
+	if ambErr, ok := errors.AsType[*AmbiguousMatchError](err); ok {
 		ambErr.WriteMatches(w)
 		return true
 	}
