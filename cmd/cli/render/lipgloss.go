@@ -1,13 +1,12 @@
 package render
 
 import (
-	"io"
 	"os"
 	"pj/internal/config"
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/term"
 )
 
@@ -16,7 +15,6 @@ const staleThreshold = 30 * 24 * time.Hour
 type LipglossRenderer struct {
 	width int
 	now   func() time.Time
-	r     *lipgloss.Renderer
 
 	nameStyle       lipgloss.Style
 	pathStyle       lipgloss.Style
@@ -26,29 +24,25 @@ type LipglossRenderer struct {
 	recentTimeStyle lipgloss.Style
 }
 
-func NewLipglossRenderer(w io.Writer, width int) *LipglossRenderer {
-	r := lipgloss.NewRenderer(w)
+func NewLipglossRenderer(width int) *LipglossRenderer {
 	return &LipglossRenderer{
 		width:           width,
 		now:             time.Now,
-		r:               r,
-		nameStyle:       r.NewStyle().Bold(true),
-		pathStyle:       r.NewStyle().Faint(true),
-		descStyle:       r.NewStyle(),
-		timeStyle:       r.NewStyle().Faint(true),
-		recentTimeStyle: r.NewStyle().Foreground(lipgloss.Color("10")),
-		staleStyle:      r.NewStyle().Faint(true),
+		nameStyle:       lipgloss.NewStyle().Bold(true),
+		pathStyle:       lipgloss.NewStyle().Faint(true),
+		descStyle:       lipgloss.NewStyle(),
+		timeStyle:       lipgloss.NewStyle().Faint(true),
+		recentTimeStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("10")),
+		staleStyle:      lipgloss.NewStyle().Faint(true),
 	}
 }
 
-func NewLipglossRendererAuto(w io.Writer) *LipglossRenderer {
+func NewLipglossRendererAuto(f *os.File) *LipglossRenderer {
 	width := 80
-	if f, ok := w.(*os.File); ok {
-		if tw, _, err := term.GetSize(f.Fd()); err == nil && tw > 0 {
-			width = tw
-		}
+	if tw, _, err := term.GetSize(f.Fd()); err == nil && tw > 0 {
+		width = tw
 	}
-	return NewLipglossRenderer(w, width)
+	return NewLipglossRenderer(width)
 }
 
 func (r *LipglossRenderer) WithClock(now func() time.Time) *LipglossRenderer {

@@ -35,7 +35,7 @@ func newTestGlobalsCore(t *testing.T) (*Globals, *bytes.Buffer, map[string]strin
 	return &Globals{
 		Cat:    cat,
 		Out:    buf,
-		Render: render.NewLipglossRenderer(buf, 80).WithClock(func() time.Time { return testFixedNow }),
+		Render: render.NewLipglossRenderer(80).WithClock(func() time.Time { return testFixedNow }),
 		RunCmd: func(name string, args ...string) error { return nil },
 	}, buf, pathMap
 }
