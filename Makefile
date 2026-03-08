@@ -180,6 +180,7 @@ release: confirm no-dirty ## Create a release (requires GITHUB_TOKEN)
 init-toolchain: ## Installs all mise managed tools
 	mise install
 	make install-hooks
+	go install golang.org/x/vuln/cmd/govulncheck@latest
 
 .PHONY: upgrade-deps
 upgrade-deps: ## Upgrades to the latest dependencies
