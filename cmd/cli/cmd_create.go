@@ -201,13 +201,6 @@ func handleCreateFormError(err error) error {
 	return err
 }
 
-func gitLabel(v bool) string {
-	if v {
-		return "Yes"
-	}
-	return "No"
-}
-
 func renderCreateSummary(g *Globals, r createResult) {
 	projectPath := filepath.Join(r.Location, r.Name)
 	checks := []string{"Directory created"}

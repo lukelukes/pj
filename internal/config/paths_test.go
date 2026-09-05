@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"pj/internal/config"
-	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -82,78 +81,6 @@ func expandTilde(path, home string) string {
 		return filepath.Join(home, path[2:])
 	}
 	return path
-}
-
-func TestDefaultProjectsDir(t *testing.T) {
-	t.Run("returns ~/projects when it exists", func(t *testing.T) {
-		tempHome := t.TempDir()
-		t.Setenv("HOME", tempHome)
-
-		projectsDir := filepath.Join(tempHome, "projects")
-		err := os.Mkdir(projectsDir, 0o755)
-		require.NoError(t, err)
-
-		got := config.DefaultProjectsDir()
-
-		assert.Equal(t, projectsDir, got)
-	})
-
-	t.Run("returns ~/ when ~/projects does not exist", func(t *testing.T) {
-		tempHome := t.TempDir()
-		t.Setenv("HOME", tempHome)
-
-		got := config.DefaultProjectsDir()
-
-		assert.Equal(t, tempHome, got)
-	})
-
-	t.Run("returns ~/ when ~/projects exists but is a file", func(t *testing.T) {
-		tempHome := t.TempDir()
-		t.Setenv("HOME", tempHome)
-
-		projectsFile := filepath.Join(tempHome, "projects")
-		err := os.WriteFile(projectsFile, []byte("not a directory"), 0o644)
-		require.NoError(t, err)
-
-		got := config.DefaultProjectsDir()
-
-		assert.Equal(t, tempHome, got)
-	})
-
-	t.Run("returns ~/ when ~/projects is not readable", func(t *testing.T) {
-		if runtime.GOOS == "windows" {
-			t.Skip("permission test not reliable on Windows")
-		}
-
-		tempHome := t.TempDir()
-		t.Setenv("HOME", tempHome)
-
-		projectsDir := filepath.Join(tempHome, "projects")
-		err := os.Mkdir(projectsDir, 0o000)
-		require.NoError(t, err)
-		t.Cleanup(func() { os.Chmod(projectsDir, 0o755) })
-
-		got := config.DefaultProjectsDir()
-
-		assert.Equal(t, tempHome, got)
-	})
-
-	t.Run("handles symlink to directory for ~/projects", func(t *testing.T) {
-		tempHome := t.TempDir()
-		t.Setenv("HOME", tempHome)
-
-		realDir := filepath.Join(tempHome, "real_projects")
-		err := os.Mkdir(realDir, 0o755)
-		require.NoError(t, err)
-
-		projectsLink := filepath.Join(tempHome, "projects")
-		err = os.Symlink(realDir, projectsLink)
-		require.NoError(t, err)
-
-		got := config.DefaultProjectsDir()
-
-		assert.Equal(t, projectsLink, got)
-	})
 }
 
 func TestExpandPath(t *testing.T) {

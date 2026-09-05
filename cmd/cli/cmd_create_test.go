@@ -68,11 +68,6 @@ func TestRenderCreateSummary(t *testing.T) {
 	})
 }
 
-func TestGitLabel(t *testing.T) {
-	assert.Equal(t, "Yes", gitLabel(true))
-	assert.Equal(t, "No", gitLabel(false))
-}
-
 func TestValidateCreateName(t *testing.T) {
 	t.Run("empty string returns Name cannot be empty", func(t *testing.T) {
 		err := validateCreateName("")

@@ -3,7 +3,6 @@ package main
 import (
 	_ "embed"
 	"fmt"
-	"pj/internal/util"
 )
 
 //go:embed completions/pj.zsh
@@ -16,10 +15,9 @@ type CompletionCmd struct {
 func (cmd *CompletionCmd) Run(g *Globals) error {
 	switch cmd.Shell {
 	case "zsh":
-		assert.Success(g.Out.Write(zshCompletion))
+		_, err := g.Out.Write(zshCompletion)
+		return err
 	default:
 		return fmt.Errorf("unsupported shell: %s", cmd.Shell)
 	}
-
-	return nil
 }
