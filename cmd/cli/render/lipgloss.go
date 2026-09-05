@@ -2,7 +2,7 @@ package render
 
 import (
 	"os"
-	"pj/internal/config"
+	"pj/internal/ui"
 	"strings"
 	"time"
 
@@ -14,6 +14,7 @@ const staleThreshold = 30 * 24 * time.Hour
 
 type LipglossRenderer struct {
 	width int
+	home  string
 	now   func() time.Time
 
 	nameStyle       lipgloss.Style
@@ -25,8 +26,10 @@ type LipglossRenderer struct {
 }
 
 func NewLipglossRenderer(width int) *LipglossRenderer {
+	home, _ := os.UserHomeDir()
 	return &LipglossRenderer{
 		width:           width,
+		home:            home,
 		now:             time.Now,
 		nameStyle:       lipgloss.NewStyle().Bold(true),
 		pathStyle:       lipgloss.NewStyle().Faint(true),
@@ -84,7 +87,7 @@ func (r *LipglossRenderer) renderItem(item ProjectListItem, now time.Time, last 
 	}
 
 	name := nameStyle.Render(item.Name)
-	path := pathStyle.Render("  " + config.ShortenPath(item.Path))
+	path := pathStyle.Render("  " + ui.DisplayPath(item.Path, r.home))
 	timeEl := timeStyle.Render(timeStr)
 
 	padding := max(1, r.width-lipgloss.Width(name)-lipgloss.Width(timeEl))

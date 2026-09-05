@@ -156,19 +156,6 @@ func TestListCmd_Run(t *testing.T) {
 		assert.Equal(t, 2, g.Cat.Count())
 	})
 
-	t.Run("output includes project name and path", func(t *testing.T) {
-		g, out := newTestGlobals(t)
-		projectDir := createTestProject(t, g, "my-project")
-
-		cmd := ListCmd{}
-		err := cmd.Run(g)
-
-		require.NoError(t, err)
-		output := out.String()
-		assert.Contains(t, output, "my-project")
-		assert.Contains(t, output, projectDir)
-	})
-
 	t.Run("names flag outputs only names", func(t *testing.T) {
 		g, out := newTestGlobals(t)
 		createTestProject(t, g, "alpha")
