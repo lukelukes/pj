@@ -1,59 +1,54 @@
 package ui
 
-import (
-	"strings"
-
-	"github.com/charmbracelet/huh"
-	"github.com/charmbracelet/lipgloss"
-)
-
-const (
-	activeSymbol = "◆"
-	borderTop    = "┌"
-	borderSide   = "│"
-	borderBottom = "└"
-	checkSymbol  = "✓"
-)
-
-func WizardTheme() *huh.Theme {
-	t := huh.ThemeBase()
-	red := lipgloss.Color("1")
-	t.Focused.ErrorMessage = t.Focused.ErrorMessage.SetString("✗").Foreground(red)
-	t.Blurred.ErrorMessage = t.Blurred.ErrorMessage.SetString("✗").Foreground(red)
-	return t
+type Draft struct {
+	Name        string
+	Location    string
+	Description string
+	Editor      string
+	Git         bool
 }
 
-func RenderSuccess(name, path string, checks []string) string {
-	var b strings.Builder
+type Severity int
 
-	border := lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+const (
+	SeverityOK Severity = iota
+	SeverityNotice
+	SeverityBlock
+)
 
-	b.WriteString(border.Render(borderTop))
-	b.WriteString(" ")
-	b.WriteString(activeSymbol)
-	b.WriteString(" Created ")
-	b.WriteString(name)
-	b.WriteString("\n")
+type Preview struct {
+	Path       string
+	Facts      []string
+	Message    string
+	Severity   Severity
+	NeedsAdopt bool
+	AdoptHint  string
+}
 
-	b.WriteString(border.Render(borderSide))
-	b.WriteString(" ")
-	b.WriteString(path)
-	b.WriteString("\n")
+func (p Preview) Blocked() bool { return p.Severity == SeverityBlock }
 
-	b.WriteString(border.Render(borderSide))
-	b.WriteString("\n")
+type PreviewFunc func(Draft) Preview
 
-	for _, check := range checks {
-		b.WriteString(border.Render(borderSide))
-		b.WriteString(" ")
-		b.WriteString(checkSymbol)
-		b.WriteString(" ")
-		b.WriteString(check)
-		b.WriteString("\n")
+type Session struct {
+	Draft      Draft
+	Preview    PreviewFunc
+	EditorHint string
+	Home       string
+}
+
+func (s Session) PreviewOf(d Draft) Preview {
+	if s.Preview == nil {
+		return Preview{}
 	}
+	return s.Preview(d)
+}
 
-	b.WriteString(border.Render(borderBottom))
-	b.WriteString("\n")
+type Outcome struct {
+	Draft     Draft
+	Adopt     bool
+	Cancelled bool
+}
 
-	return b.String()
+type Runner interface {
+	Run(Session) (Outcome, error)
 }

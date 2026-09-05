@@ -1,223 +1,224 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
-	"path/filepath"
-	"pj/internal/catalog"
+	"pj/internal/config"
+	"pj/internal/create"
 	"pj/internal/ui"
-	"strings"
+	"pj/internal/ui/wizardtea"
 
-	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/x/term"
 )
 
-type CreateCmd struct{}
-
-type createResult struct {
-	Name        string
-	Location    string
-	Description string
-	Editor      string
-	Git         bool
-}
-
-func validateCreateName(name string) error {
-	err := catalog.ValidateName(name)
-	if errors.Is(err, catalog.ErrEmptyName) {
-		return errors.New("Name cannot be empty")
-	}
-	return err
+type CreateCmd struct {
+	Name    string `arg:"" optional:"" help:"Project name"`
+	At      string `help:"Parent directory (defaults to the working directory)"`
+	Desc    string `help:"Short description"`
+	Editor  string `help:"Editor command for this project"`
+	NoGit   bool   `help:"Skip git initialization"`
+	Adopt   bool   `help:"Adopt the directory if it already exists"`
+	NoInput bool   `help:"Never prompt; fail when information is missing"`
 }
 
 func (cmd *CreateCmd) Run(g *Globals) error {
-	var name string
-	var description string
-	var editor string
-	gitInit := true
-
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("getting working directory: %w", err)
 	}
-	location := cwd
 
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewInput().
-				Title("Name").
-				Value(&name).
-				Validate(validateCreateName),
-		),
-		huh.NewGroup(
-			huh.NewInput().
-				Title("Location").
-				Description("Press Enter to accept, or type a new path").
-				Value(&location),
-		),
-		huh.NewGroup(
-			huh.NewInput().
-				Title("Description (optional)").
-				Placeholder("Press Enter to skip").
-				Value(&description),
-		),
-		huh.NewGroup(
-			huh.NewInput().
-				Title("Editor (optional)").
-				Placeholder("Press Enter to skip").
-				Value(&editor),
-		),
-		huh.NewGroup(
-			huh.NewSelect[bool]().
-				Title("Initialize git repository?").
-				Options(
-					huh.NewOption("Yes (recommended)", true).Selected(true),
-					huh.NewOption("No", false),
-				).
-				Value(&gitInit),
-		),
-	).WithTheme(ui.WizardTheme())
-
-	if err := form.Run(); err != nil {
-		return handleCreateFormError(err)
-	}
-
-	result := createResult{
-		Name:        strings.TrimSpace(name),
-		Location:    strings.TrimSpace(location),
-		Description: strings.TrimSpace(description),
-		Editor:      strings.TrimSpace(editor),
-		Git:         gitInit,
-	}
-
-	return executeCreate(g, result)
-}
-
-func executeCreate(g *Globals, result createResult) error {
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt)
-	defer signal.Stop(sigCh)
-
-	projectPath, err := createProjectDir(result.Location, result.Name)
+	location, err := resolveLocation(cmd.At, cwd)
 	if err != nil {
 		return err
 	}
 
-	completed := false
-	defer func() {
-		if !completed {
-			os.RemoveAll(projectPath)
-		}
-	}()
+	home, _ := os.UserHomeDir()
+	env := create.CatalogEnv{Cat: g.Cat}
 
+	req := create.Request{
+		Name:        cmd.Name,
+		Location:    location,
+		Description: cmd.Desc,
+		Editor:      cmd.Editor,
+		Git:         !cmd.NoGit,
+	}
+
+	adopt := cmd.Adopt
+	if cmd.needsWizard() {
+		outcome, err := cmd.runWizard(env, req, home)
+		if err != nil {
+			return err
+		}
+		if outcome.Cancelled {
+			return nil
+		}
+		req = toRequest(outcome.Draft)
+		adopt = outcome.Adopt
+	}
+
+	plan := create.BuildPlan(req, env)
+	if plan.Blocker != nil {
+		return plan.Blocker
+	}
+	if plan.PathTaken != nil {
+		return fmt.Errorf("%s is already tracked as %q", ui.DisplayPath(plan.Path, home), plan.PathTaken.Name)
+	}
+	if plan.NeedsAdopt() && !adopt {
+		return fmt.Errorf("%s already exists; pass --adopt to add it to the catalog", ui.DisplayPath(plan.Path, home))
+	}
+
+	return runPlan(g, plan, adopt, home)
+}
+
+func resolveLocation(at, cwd string) (string, error) {
+	if at == "" {
+		return cwd, nil
+	}
+	expanded, err := config.ExpandPath(at)
+	if err != nil {
+		return "", fmt.Errorf("invalid --at path: %w", err)
+	}
+	return expanded, nil
+}
+
+func (cmd *CreateCmd) needsWizard() bool {
+	if cmd.NoInput || cmd.Name != "" {
+		return false
+	}
+	return term.IsTerminal(os.Stdin.Fd())
+}
+
+func (cmd *CreateCmd) runWizard(env create.Env, req create.Request, home string) (ui.Outcome, error) {
+	session := ui.Session{
+		Draft:      toDraft(req),
+		Preview:    previewFunc(env, home),
+		EditorHint: os.Getenv("EDITOR"),
+		Home:       home,
+	}
+
+	return wizardtea.Runner{Palette: ui.DefaultPalette()}.Run(session)
+}
+
+func runPlan(g *Globals, plan create.Plan, adopt bool, home string) error {
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt)
+	defer signal.Stop(sigCh)
+
+	createdDir := !plan.DirExists
 	go func() {
 		if _, ok := <-sigCh; ok {
-			os.RemoveAll(projectPath)
+			if createdDir {
+				os.RemoveAll(plan.Path)
+			}
 			os.Exit(130)
 		}
 	}()
 
-	if result.Git {
-		if err := initGitRepo(g, projectPath); err != nil {
-			return err
-		}
-	}
-
-	if err := registerProject(g, result, projectPath); err != nil {
+	svc := create.Service{Cat: g.Cat, Run: quietRun, GitFound: gitAvailable}
+	outcome, err := svc.Execute(plan, adopt)
+	if err != nil {
 		return err
 	}
 
-	completed = true
-	renderCreateSummary(g, result)
-	printCdHint(g, projectPath)
+	jumped := writeCdFile(outcome.Path)
+	fmt.Fprint(g.Out, ui.RenderReceipt(ui.Receipt{
+		Name:    plan.Name,
+		Path:    ui.DisplayPath(outcome.Path, home),
+		Steps:   outcome.Steps,
+		Adopted: outcome.Adopted,
+		Jumped:  jumped,
+	}, ui.DefaultPalette()))
+
+	if !jumped {
+		fmt.Fprintf(g.Out, "\nRun: cd %s\n", outcome.Path)
+	}
 	return nil
 }
 
-func createProjectDir(location, name string) (string, error) {
-	projectPath := filepath.Join(location, name)
-	if _, err := os.Stat(projectPath); err == nil {
-		return "", fmt.Errorf("Directory already exists: %s", projectPath)
+func previewFunc(env create.Env, home string) ui.PreviewFunc {
+	return func(d ui.Draft) ui.Preview {
+		return toPreview(create.BuildPlan(toRequest(d), env), home)
 	}
-	if err := os.Mkdir(projectPath, 0o755); err != nil {
-		if errors.Is(err, os.ErrPermission) {
-			return "", fmt.Errorf("Permission denied: %s", projectPath)
+}
+
+func toPreview(p create.Plan, home string) ui.Preview {
+	switch {
+	case p.Blocker != nil:
+		return ui.Preview{Severity: ui.SeverityBlock, Message: p.Blocker.Error()}
+	case p.PathTaken != nil:
+		return ui.Preview{
+			Severity: ui.SeverityBlock,
+			Message:  fmt.Sprintf("%s is already tracked as %q", ui.DisplayPath(p.Path, home), p.PathTaken.Name),
 		}
-		return "", fmt.Errorf("creating directory: %w", err)
+	case p.DirExists:
+		return ui.Preview{
+			Path:       ui.DisplayPath(p.Path, home),
+			Severity:   ui.SeverityNotice,
+			NeedsAdopt: true,
+			Message:    fmt.Sprintf("%s exists · %s", ui.DisplayPath(p.Path, home), pluralFiles(p.DirEntries)),
+			AdoptHint:  "↵ adopt into catalog",
+		}
 	}
-	return projectPath, nil
+
+	preview := ui.Preview{Path: ui.DisplayPath(p.Path, home)}
+	if p.WillInitGit() {
+		preview.Facts = append(preview.Facts, "git init")
+	}
+	if nested := p.NestedIn(); nested != "" {
+		preview.Facts = append(preview.Facts, "inside "+ui.DisplayPath(nested, home))
+	}
+	if p.Editor != "" {
+		preview.Facts = append(preview.Facts, p.Editor)
+	}
+	if p.NameTaken != nil {
+		preview.Severity = ui.SeverityNotice
+		preview.Message = "name already used by " + ui.DisplayPath(p.NameTaken.Path, home)
+	}
+	return preview
 }
 
-func initGitRepo(g *Globals, projectPath string) error {
-	if _, err := exec.LookPath("git"); err != nil {
-		fmt.Fprintln(g.Out, "⚠ Git not found, skipping initialization")
-		return nil
+func pluralFiles(n int) string {
+	if n == 1 {
+		return "1 file"
 	}
-	cmd := exec.Command("git", "init", projectPath)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("initializing git repository: %w", err)
-	}
-	return createGitignore(projectPath)
+	return fmt.Sprintf("%d files", n)
 }
 
-func createGitignore(projectPath string) error {
-	content := strings.Join([]string{
-		".DS_Store",
-		"Thumbs.db",
-		"",
-		".idea/",
-		".vscode/",
-		"*.swp",
-		"",
-		"/dist/",
-		"/build/",
-		"/out/",
-		"",
-		"/vendor/",
-		"/node_modules/",
-		"",
-	}, "\n")
-	return os.WriteFile(filepath.Join(projectPath, ".gitignore"), []byte(content), 0o644)
+func toRequest(d ui.Draft) create.Request {
+	return create.Request{
+		Name:        d.Name,
+		Location:    d.Location,
+		Description: d.Description,
+		Editor:      d.Editor,
+		Git:         d.Git,
+	}
 }
 
-func registerProject(g *Globals, result createResult, projectPath string) error {
-	p := catalog.NewProject(result.Name, projectPath).
-		WithDescription(result.Description).
-		WithEditor(result.Editor)
-	if err := g.Cat.Add(p); err != nil {
-		return fmt.Errorf("adding project to catalog: %w", err)
+func toDraft(r create.Request) ui.Draft {
+	return ui.Draft{
+		Name:        r.Name,
+		Location:    r.Location,
+		Description: r.Description,
+		Editor:      r.Editor,
+		Git:         r.Git,
 	}
-	if err := g.Cat.Save(); err != nil {
-		return fmt.Errorf("saving catalog: %w", err)
-	}
-	return nil
 }
 
-func handleCreateFormError(err error) error {
-	if errors.Is(err, huh.ErrUserAborted) {
-		return nil
-	}
-	return err
+func gitAvailable() bool {
+	_, err := exec.LookPath("git")
+	return err == nil
 }
 
-func renderCreateSummary(g *Globals, r createResult) {
-	projectPath := filepath.Join(r.Location, r.Name)
-	checks := []string{"Directory created"}
-	if r.Git {
-		checks = append(checks, "Git initialized")
-	}
-	checks = append(checks, "Added to catalog")
-	output := ui.RenderSuccess(r.Name, projectPath, checks)
-	fmt.Fprint(g.Out, output)
+func quietRun(name string, args ...string) error {
+	return exec.Command(name, args...).Run()
 }
 
-func printCdHint(g *Globals, projectPath string) {
+func writeCdFile(path string) bool {
 	cdFile := os.Getenv("__PJ_CD_FILE")
-	if cdFile != "" {
-		if err := os.WriteFile(cdFile, []byte(projectPath), 0o600); err == nil {
-			return
-		}
+	if cdFile == "" {
+		return false
 	}
-	fmt.Fprintf(g.Out, "\nRun: cd %s\n", projectPath)
+	return os.WriteFile(cdFile, []byte(path), 0o600) == nil
 }

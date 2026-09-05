@@ -1,0 +1,10 @@
+→  name:     booster
+│  where:    ~/dev
+│  about:    what is it for
+│  editor:   nvim                             inherited
+│  git:      ● init  ○ skip
+│
+└  ✗ ~/dev/booster is already tracked as "booster"
+
+
+↵ next   ⇧⇥ prev   esc cancel

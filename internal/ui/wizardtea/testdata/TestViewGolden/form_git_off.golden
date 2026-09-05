@@ -1,0 +1,10 @@
+✓  name:     api-gateway
+│  where:    ~/dev
+│  about:    what is it for
+│  editor:   nvim                             inherited
+→  git:      ○ init  ● skip                   ↵ creates
+│
+└  ~/dev/api-gateway
+
+
+↵ next   ⇧⇥ prev   esc cancel
