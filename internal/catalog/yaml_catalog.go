@@ -140,22 +140,12 @@ func (c *YAMLCatalog) Search(query string) []Project {
 	var results []Project
 
 	for _, p := range c.projects {
-		if matchesQuery(p, query) {
+		if strings.Contains(strings.ToLower(p.Name), query) || strings.Contains(strings.ToLower(p.Path), query) {
 			results = append(results, p)
 		}
 	}
 
 	return results
-}
-
-func matchesQuery(p Project, query string) bool {
-	if strings.Contains(strings.ToLower(p.Name), query) {
-		return true
-	}
-	if strings.Contains(strings.ToLower(p.Path), query) {
-		return true
-	}
-	return false
 }
 
 func (c *YAMLCatalog) Count() int {
