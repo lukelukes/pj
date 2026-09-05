@@ -751,6 +751,86 @@ func TestFindProject(t *testing.T) {
 		assert.Equal(t, "test", ambErr.Query)
 		assert.Len(t, ambErr.Matches, 2)
 	})
+
+	t.Run("prefers exact name over substring matches", func(t *testing.T) {
+		g, _ := newTestGlobals(t)
+		createTestProject(t, g, "test1")
+		createTestProject(t, g, "test-md-render")
+		createTestProject(t, g, "test")
+
+		project, err := findProject(g.Cat, "test")
+		require.NoError(t, err)
+		assert.Equal(t, "test", project.Name)
+	})
+
+	t.Run("exact name match ignores case", func(t *testing.T) {
+		g, _ := newTestGlobals(t)
+		createTestProject(t, g, "Test")
+		createTestProject(t, g, "test-other")
+
+		project, err := findProject(g.Cat, "test")
+		require.NoError(t, err)
+		assert.Equal(t, "Test", project.Name)
+	})
+
+	t.Run("reports only exact name matches when names collide", func(t *testing.T) {
+		g, _ := newTestGlobals(t)
+		createTestProject(t, g, "test")
+		createTestProject(t, g, "test")
+		createTestProject(t, g, "test-other")
+
+		_, err := findProject(g.Cat, "test")
+
+		var ambErr *AmbiguousMatchError
+		require.ErrorAs(t, err, &ambErr)
+		assert.Len(t, ambErr.Matches, 2)
+		for _, p := range ambErr.Matches {
+			assert.Equal(t, "test", p.Name)
+		}
+	})
+
+	t.Run("prefers exact path over substring matches", func(t *testing.T) {
+		g, _ := newTestGlobals(t)
+		parent := createTestProject(t, g, "parent")
+		child := filepath.Join(parent, "child")
+		require.NoError(t, os.MkdirAll(child, 0o755))
+		require.NoError(t, (&AddCmd{Path: child, Name: "child"}).Run(g))
+
+		project, err := findProject(g.Cat, parent)
+		require.NoError(t, err)
+		assert.Equal(t, "parent", project.Name)
+	})
+
+	t.Run("does not resolve bare names against the working directory", func(t *testing.T) {
+		g, _ := newTestGlobals(t)
+		cwd := t.TempDir()
+		sibling := filepath.Join(cwd, "target")
+		require.NoError(t, os.MkdirAll(sibling, 0o755))
+		require.NoError(t, (&AddCmd{Path: sibling, Name: "renamed"}).Run(g))
+		createTestProject(t, g, "target")
+		t.Chdir(cwd)
+
+		project, err := findProject(g.Cat, "target")
+		require.NoError(t, err)
+		assert.Equal(t, "target", project.Name)
+	})
+
+	t.Run("sorts ambiguous matches by name", func(t *testing.T) {
+		g, _ := newTestGlobals(t)
+		createTestProject(t, g, "test-c")
+		createTestProject(t, g, "test-a")
+		createTestProject(t, g, "test-b")
+
+		_, err := findProject(g.Cat, "test")
+
+		var ambErr *AmbiguousMatchError
+		require.ErrorAs(t, err, &ambErr)
+		names := make([]string, 0, len(ambErr.Matches))
+		for _, p := range ambErr.Matches {
+			names = append(names, p.Name)
+		}
+		assert.Equal(t, []string{"test-a", "test-b", "test-c"}, names)
+	})
 }
 
 func TestAmbiguousMatchOutput(t *testing.T) {

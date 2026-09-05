@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/exec"
 	"pj/internal/catalog"
+	"pj/internal/config"
+	"slices"
 	"strings"
 )
 
@@ -35,14 +37,54 @@ func handleFindError(w io.Writer, err error) bool {
 }
 
 func findProject(cat catalog.Catalog, query string) (catalog.Project, error) {
-	projects := cat.Search(query)
-	if len(projects) == 0 {
+	matches := cat.Search(query)
+	if len(matches) == 0 {
 		return catalog.Project{}, fmt.Errorf("no project found matching: %s", query)
 	}
-	if len(projects) > 1 {
-		return catalog.Project{}, &AmbiguousMatchError{Query: query, Matches: projects}
+
+	if exact := filterExactName(matches, query); len(exact) > 0 {
+		matches = exact
+	} else if p, ok := lookupByPath(cat, query); ok {
+		return p, nil
 	}
-	return projects[0], nil
+
+	if len(matches) == 1 {
+		return matches[0], nil
+	}
+
+	slices.SortFunc(matches, func(a, b catalog.Project) int {
+		if c := strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)); c != 0 {
+			return c
+		}
+		return strings.Compare(a.Path, b.Path)
+	})
+	return catalog.Project{}, &AmbiguousMatchError{Query: query, Matches: matches}
+}
+
+func filterExactName(projects []catalog.Project, name string) []catalog.Project {
+	var exact []catalog.Project
+	for _, p := range projects {
+		if strings.EqualFold(p.Name, name) {
+			exact = append(exact, p)
+		}
+	}
+	return exact
+}
+
+func lookupByPath(cat catalog.Catalog, query string) (catalog.Project, bool) {
+	if !looksLikePath(query) {
+		return catalog.Project{}, false
+	}
+	path, err := config.ExpandPath(query)
+	if err != nil {
+		return catalog.Project{}, false
+	}
+	p, err := cat.GetByPath(path)
+	return p, err == nil
+}
+
+func looksLikePath(query string) bool {
+	return strings.HasPrefix(query, "~") || strings.ContainsRune(query, os.PathSeparator)
 }
 
 func splitCommand(s string) []string {
