@@ -1,7 +1,6 @@
 package proptest
 
 import (
-	"pj/internal/catalog"
 	"strings"
 	"testing"
 
@@ -28,18 +27,6 @@ func TestProperty_Search_SubsetOfList(t *testing.T) {
 		allProjects := h.Catalog.List()
 
 		assertSubset(h.T, searchResults, allProjects)
-	})
-}
-
-func TestProperty_Filter_SubsetOfList(t *testing.T) {
-	RunWithCatalog(t, func(h *CatalogHarness) {
-		h.AddProjects(typicalMinProjects, typicalMaxProjects)
-
-		opts := filterOptionsGen().Draw(h.T, "filterOpts")
-		filtered := h.Catalog.Filter(opts)
-		allProjects := h.Catalog.List()
-
-		assertSubset(h.T, filtered, allProjects)
 	})
 }
 
@@ -75,42 +62,6 @@ func TestProperty_Search_UnrelatedProjectsNoEffect(t *testing.T) {
 		}
 		if resultsAfter[0].ID != knownProject.ID {
 			h.T.Fatalf("search returned wrong project after adding unrelated")
-		}
-	})
-}
-
-func TestProperty_Sort_Transitivity(t *testing.T) {
-	RunWithCatalog(t, func(h *CatalogHarness) {
-		h.AddProjects(transitivityMinCount, typicalMaxProjects)
-
-		if h.Catalog.Count() < transitivityMinCount {
-			h.T.Skip("need at least 3 projects")
-		}
-
-		opts := catalog.FilterOptions{SortBy: catalog.SortByName}
-		sorted := h.Catalog.Filter(opts)
-
-		assertSortedBy(h.T, sorted, catalog.SortByName, false)
-	})
-}
-
-func TestProperty_Sort_Stability(t *testing.T) {
-	RunWithCatalog(t, func(h *CatalogHarness) {
-		h.AddProjects(typicalMinProjects, typicalMaxProjects)
-
-		sortFields := []catalog.SortField{catalog.SortByName, catalog.SortByPath, catalog.SortByAddedAt, catalog.SortByLastAccessed}
-		sortBy := rapid.SampledFrom(sortFields).Draw(h.T, "sortBy")
-
-		opts := catalog.FilterOptions{SortBy: sortBy}
-
-		sorted1 := h.Catalog.Filter(opts)
-		sorted2 := h.Catalog.Filter(opts)
-
-		assertSameIDs(h.T, sorted1, sorted2)
-		for i := range sorted1 {
-			if sorted1[i].ID != sorted2[i].ID {
-				h.T.Fatalf("sort not stable: position %d differs", i)
-			}
 		}
 	})
 }

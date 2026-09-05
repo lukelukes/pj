@@ -160,8 +160,3 @@ func (c *CheckedCatalog) Search(query string) []catalog.Project {
 	}
 	return realResults
 }
-
-func (c *CheckedCatalog) Filter(opts catalog.FilterOptions) []catalog.Project {
-	realResults := c.real.Filter(opts)
-	return realResults
-}

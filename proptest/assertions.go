@@ -2,7 +2,6 @@ package proptest
 
 import (
 	"pj/internal/catalog"
-	"strings"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -45,32 +44,6 @@ func assertSubset(t *rapid.T, subset, superset []catalog.Project) {
 	for _, p := range subset {
 		if !superIDs[p.ID] {
 			t.Fatalf("subset contains ID %s not in superset", p.ID)
-		}
-	}
-}
-
-func assertSortedBy(t *rapid.T, projects []catalog.Project, field catalog.SortField, desc bool) {
-	t.Helper()
-	for i := 0; i < len(projects)-1; i++ {
-		a, b := projects[i], projects[i+1]
-		var inOrder bool
-		switch field {
-		case catalog.SortByName:
-			inOrder = strings.ToLower(a.Name) <= strings.ToLower(b.Name)
-		case catalog.SortByPath:
-			inOrder = a.Path <= b.Path
-		case catalog.SortByAddedAt:
-			inOrder = !a.AddedAt.After(b.AddedAt)
-		case catalog.SortByLastAccessed:
-			inOrder = !a.LastAccessed.After(b.LastAccessed)
-		default:
-			inOrder = strings.ToLower(a.Name) <= strings.ToLower(b.Name)
-		}
-		if desc {
-			inOrder = !inOrder || a.ID == b.ID
-		}
-		if !inOrder {
-			t.Fatalf("sort order violated at positions %d, %d", i, i+1)
 		}
 	}
 }

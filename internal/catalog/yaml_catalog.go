@@ -158,64 +158,6 @@ func matchesQuery(p Project, query string) bool {
 	return false
 }
 
-func (c *YAMLCatalog) Filter(opts FilterOptions) []Project {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	var results []Project
-	for _, p := range c.projects {
-		if matchesFilter(p, opts) {
-			results = append(results, p)
-		}
-	}
-
-	sortProjects(results, opts.SortBy, opts.Descending)
-	return results
-}
-
-func matchesFilter(p Project, opts FilterOptions) bool {
-	if opts.Query != "" && !matchesQuery(p, strings.ToLower(opts.Query)) {
-		return false
-	}
-	return true
-}
-
-func sortProjects(projects []Project, by SortField, descending bool) {
-	if by == "" {
-		by = SortByName
-	}
-
-	slices.SortStableFunc(projects, func(a, b Project) int {
-		c := compareProjects(a, b, by)
-		if descending {
-			return -c
-		}
-		return c
-	})
-}
-
-func compareProjects(a, b Project, by SortField) int {
-	switch by {
-	case SortByPath:
-		if c := strings.Compare(a.Path, b.Path); c != 0 {
-			return c
-		}
-	case SortByLastAccessed:
-		if c := a.LastAccessed.Compare(b.LastAccessed); c != 0 {
-			return c
-		}
-	case SortByAddedAt:
-		if c := a.AddedAt.Compare(b.AddedAt); c != 0 {
-			return c
-		}
-	default:
-		if c := strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)); c != 0 {
-			return c
-		}
-	}
-	return strings.Compare(a.ID, b.ID)
-}
-
 func (c *YAMLCatalog) Count() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -228,11 +170,7 @@ func (c *YAMLCatalog) Save() error {
 
 	file := catalogFile{
 		Version:  1,
-		Projects: make([]Project, 0, len(c.projects)),
-	}
-
-	for _, p := range c.projects {
-		file.Projects = append(file.Projects, p)
+		Projects: c.listUnlocked(),
 	}
 
 	slices.SortStableFunc(file.Projects, func(a, b Project) int {

@@ -14,7 +14,6 @@ const (
 	maxProjects          = 20
 	typicalMinProjects   = 1
 	typicalMaxProjects   = 10
-	transitivityMinCount = 3
 	minUnrelatedProjects = 1
 	maxUnrelatedProjects = 5
 )

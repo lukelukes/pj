@@ -2,7 +2,6 @@ package proptest
 
 import (
 	"fmt"
-	"pj/internal/catalog"
 
 	"pgregory.net/rapid"
 )
@@ -17,23 +16,6 @@ var (
 
 func validNameGen() *rapid.Generator[string] {
 	return rapid.StringMatching(`[a-zA-Z][a-zA-Z0-9_-]{0,30}`)
-}
-
-func filterOptionsGen() *rapid.Generator[catalog.FilterOptions] {
-	return rapid.Custom(func(t *rapid.T) catalog.FilterOptions {
-		var query string
-		if rapid.Bool().Draw(t, "hasQuery") {
-			query = queryGen.Draw(t, "query")
-		}
-
-		sortFields := []catalog.SortField{"", catalog.SortByName, catalog.SortByPath, catalog.SortByLastAccessed, catalog.SortByAddedAt}
-
-		return catalog.FilterOptions{
-			Query:      query,
-			SortBy:     rapid.SampledFrom(sortFields).Draw(t, "sortBy"),
-			Descending: rapid.Bool().Draw(t, "desc"),
-		}
-	})
 }
 
 func malformedYAMLGen() *rapid.Generator[string] {

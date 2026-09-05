@@ -216,30 +216,6 @@ func TestYAMLCatalog_Search(t *testing.T) {
 	})
 }
 
-func TestYAMLCatalog_Filter(t *testing.T) {
-	t.Run("filters by query", func(t *testing.T) {
-		cat := newTestYAMLCatalog(t)
-		require.NoError(t, cat.Add(catalog.NewProject("project-one", newTestDir(t))))
-		require.NoError(t, cat.Add(catalog.NewProject("project-two", newTestDir(t))))
-		require.NoError(t, cat.Add(catalog.NewProject("something-else", newTestDir(t))))
-
-		results := cat.Filter(catalog.FilterOptions{Query: "project"})
-
-		assert.Len(t, results, 2)
-	})
-
-	t.Run("returns all when no filter", func(t *testing.T) {
-		cat := newTestYAMLCatalog(t)
-		require.NoError(t, cat.Add(catalog.NewProject("p1", newTestDir(t))))
-		require.NoError(t, cat.Add(catalog.NewProject("p2", newTestDir(t))))
-		require.NoError(t, cat.Add(catalog.NewProject("p3", newTestDir(t))))
-
-		results := cat.Filter(catalog.FilterOptions{})
-
-		assert.Len(t, results, 3)
-	})
-}
-
 func TestYAMLCatalog_Persistence(t *testing.T) {
 	t.Run("save and load preserves projects", func(t *testing.T) {
 		dir := t.TempDir()
@@ -420,7 +396,7 @@ func TestYAMLCatalog_ConcurrentAccess(t *testing.T) {
 			go func(id int) {
 				defer wg.Done()
 
-				switch id % 4 {
+				switch id % 3 {
 				case 0:
 					results := cat.Search("project")
 					assert.NotEmpty(t, results)
@@ -430,9 +406,6 @@ func TestYAMLCatalog_ConcurrentAccess(t *testing.T) {
 				case 2:
 					count := cat.Count()
 					assert.Equal(t, 3, count)
-				case 3:
-					results := cat.Filter(catalog.FilterOptions{Query: "project"})
-					assert.NotEmpty(t, results)
 				}
 			}(i)
 		}
