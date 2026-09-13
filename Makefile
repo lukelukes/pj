@@ -162,17 +162,24 @@ verify-ci: build ## Run all quality checks - in CI
 confirm:
 	@echo -n 'Are you sure? [y/N] ' && read ans && [ $${ans:-N} = y ]
 
-.PHONY: no-dirty
-no-dirty:
-	@git diff --quiet HEAD -- || (echo "Error: uncommitted changes in working tree" && exit 1)
-
 .PHONY: release-dry
 release-dry: ## Test goreleaser locally (no publish)
 	goreleaser release --snapshot --clean
 
 .PHONY: release
-release: confirm no-dirty ## Create a release (requires GITHUB_TOKEN)
-	goreleaser release --clean
+release: confirm ## Trigger the release workflow on master and follow it
+	@git fetch -q origin master --tags
+	@existing="$$(git tag --points-at origin/master 'v*')"; \
+	if [ -n "$$existing" ]; then \
+		echo "Error: origin/master is already released as $$existing"; exit 1; \
+	fi
+	gh workflow run release.yml --ref master
+	@sleep 3 && gh run watch $$(gh run list --workflow=release.yml --limit 1 --json databaseId -q '.[0].databaseId') --exit-status
+
+.PHONY: release-plan
+release-plan: ## Show what the next release would be, without publishing
+	gh workflow run release.yml --ref master -f dry_run=true
+	@sleep 3 && gh run watch $$(gh run list --workflow=release.yml --limit 1 --json databaseId -q '.[0].databaseId') --exit-status
 
 ##@ Utility
 

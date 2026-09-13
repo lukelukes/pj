@@ -1,15 +1,23 @@
 name: Release
 
 on:
-  push:
-    branches:
-      - master
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Compute the next version without publishing"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -17,6 +25,14 @@ jobs:
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 #v6.0.1
         with:
           fetch-depth: 0
+
+      - name: Refuse to re-release an already tagged commit
+        run: |
+          existing="$(git tag --points-at HEAD 'v*')"
+          if [ -n "$existing" ]; then
+            echo "::error::HEAD $(git rev-parse --short HEAD) is already released as $existing"
+            exit 1
+          fi
 
       - name: Set up Go
         uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c #v6.1.0
@@ -41,11 +57,16 @@ jobs:
         with:
           hooks: goreleaser
           allow-initial-development-versions: true
+          dry: ${{ inputs.dry_run }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Release info
         if: steps.semantic.outputs.version != ''
         run: |
-          echo "Released version: ${{ steps.semantic.outputs.version }}"
-          echo "Release URL: https://github.com/${{ github.repository }}/releases/tag/v${{ steps.semantic.outputs.version }}"
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "Dry run: next version would be ${{ steps.semantic.outputs.version }}"
+          else
+            echo "Released version: ${{ steps.semantic.outputs.version }}"
+            echo "Release URL: https://github.com/${{ github.repository }}/releases/tag/v${{ steps.semantic.outputs.version }}"
+          fi
