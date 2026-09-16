@@ -114,6 +114,8 @@ projects:
 }
 
 var (
+	tagGen           = rapid.StringMatching(`[a-m0-9]([a-m0-9_.:/+-]{0,8}[a-m0-9_./+-])?`)
+	tagsGen          = rapid.SliceOfN(tagGen, 0, 5)
 	fieldNameGen     = rapid.SampledFrom(catalog.FilterFields())
 	opGen            = rapid.SampledFrom([]string{"=", "!=", "~", "!~"})
 	optionalFieldGen = rapid.OneOf(rapid.Just(""), rapid.StringMatching(`[a-m]{1,10}`))

@@ -47,6 +47,12 @@ const (
 	InvProjectionLineCount     = "INV-46"
 	InvJSONRoundTrip           = "INV-47"
 	InvSaveLoadRoundTrip       = "INV-50"
+	InvTagNormalizeIdempotent  = "INV-51"
+	InvTagsSortedUnique        = "INV-52"
+	InvLenientLoadEqualsStrict = "INV-53"
+	InvTagSugarEqualsTerm      = "INV-54"
+	InvAddRemoveTagsInverse    = "INV-55"
+	InvTagSetIsUnion           = "INV-56"
 )
 
 func verifyStructuralInvariants(t *rapid.T, cat catalog.Catalog) {
