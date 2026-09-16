@@ -7,12 +7,17 @@ import (
 )
 
 type Selector struct {
-	Filters []string `name:"filter" short:"f" sep:"none" help:"Match field op value (name, path, editor, desc; =, !=, ~, !~). Repeat to AND."`
+	Tags    []string `name:"tag" short:"t" help:"Match a tag (supports globs). Repeat to AND."`
+	Filters []string `name:"filter" short:"f" sep:"none" help:"Match field op value (name, path, editor, desc, tag; =, !=, ~, !~). Repeat to AND."`
 }
 
 func (s Selector) Filter() (catalog.Filter, error) {
 	filters := make([]catalog.Filter, 0, len(s.Filters))
-	for _, raw := range s.Filters {
+	terms := slices.Clone(s.Filters)
+	for _, tag := range s.Tags {
+		terms = append(terms, "tag="+tag)
+	}
+	for _, raw := range terms {
 		term, err := catalog.ParseTerm(raw)
 		if err != nil {
 			return nil, err

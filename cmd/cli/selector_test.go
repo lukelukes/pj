@@ -57,7 +57,7 @@ func TestListSelection(t *testing.T) {
 	cmd.Filters = []string{"bogus=1"}
 	err := cmd.Run(g)
 	require.ErrorIs(t, err, catalog.ErrUnknownField)
-	require.ErrorContains(t, err, "desc, editor, name, path")
+	require.ErrorContains(t, err, "desc, editor, name, path, tag")
 	require.Empty(t, out.String())
 	cmd.Filters = nil
 	cmd.Names = false
@@ -90,7 +90,7 @@ var errOutput = errors.New("output failed")
 func (failingWriter) Write([]byte) (int, error) { return 0, errOutput }
 
 func TestProjectionWriteError(t *testing.T) {
-	for _, output := range []Output{OutputNames, OutputPaths, OutputJSON} {
-		require.ErrorIs(t, printProjects(failingWriter{}, []catalog.Project{{Name: "alpha"}}, output), errOutput)
+	for _, output := range []Output{OutputNames, OutputPaths, OutputJSON, OutputTags} {
+		require.ErrorIs(t, printProjects(failingWriter{}, []catalog.Project{{Name: "alpha", Tags: []string{"cli"}}}, output), errOutput)
 	}
 }

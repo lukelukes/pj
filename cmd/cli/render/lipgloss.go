@@ -20,6 +20,7 @@ type LipglossRenderer struct {
 	nameStyle       lipgloss.Style
 	pathStyle       lipgloss.Style
 	descStyle       lipgloss.Style
+	tagStyle        lipgloss.Style
 	timeStyle       lipgloss.Style
 	staleStyle      lipgloss.Style
 	recentTimeStyle lipgloss.Style
@@ -34,6 +35,7 @@ func NewLipglossRenderer(width int) *LipglossRenderer {
 		nameStyle:       lipgloss.NewStyle().Bold(true),
 		pathStyle:       lipgloss.NewStyle().Faint(true),
 		descStyle:       lipgloss.NewStyle(),
+		tagStyle:        lipgloss.NewStyle().Faint(true),
 		timeStyle:       lipgloss.NewStyle().Faint(true),
 		recentTimeStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("10")),
 		staleStyle:      lipgloss.NewStyle().Faint(true),
@@ -76,11 +78,13 @@ func (r *LipglossRenderer) renderItem(item ProjectListItem, now time.Time, last 
 	nameStyle := r.nameStyle
 	pathStyle := r.pathStyle
 	descStyle := r.descStyle
+	tagStyle := r.tagStyle
 	timeStyle := r.timeStyle
 	if isStale {
 		nameStyle = r.staleStyle.Bold(true)
 		pathStyle = r.staleStyle
 		descStyle = r.staleStyle
+		tagStyle = r.staleStyle
 		timeStyle = r.staleStyle
 	} else if age < 1*time.Hour {
 		timeStyle = r.recentTimeStyle
@@ -99,6 +103,9 @@ func (r *LipglossRenderer) renderItem(item ProjectListItem, now time.Time, last 
 	if item.Description != "" {
 		desc := descStyle.Render("  " + item.Description)
 		lines = append(lines, desc)
+	}
+	if len(item.Tags) > 0 {
+		lines = append(lines, tagStyle.Render("  "+ui.FormatTags(item.Tags)))
 	}
 	if !last {
 		lines = append(lines, "", "")

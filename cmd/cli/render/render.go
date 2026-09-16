@@ -11,6 +11,7 @@ type ProjectListView struct {
 }
 
 type ProjectListItem struct {
+	Tags        []string
 	Name        string
 	Path        string
 	Description string
