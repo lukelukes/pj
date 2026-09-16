@@ -5,22 +5,25 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"pj/internal/catalog"
 	"pj/internal/config"
 	"pj/internal/create"
 	"pj/internal/ui"
 	"pj/internal/ui/wizardtea"
+	"strings"
 
 	"github.com/charmbracelet/x/term"
 )
 
 type CreateCmd struct {
-	Name    string `arg:"" optional:"" help:"Project name"`
-	At      string `help:"Parent directory (defaults to the working directory)"`
-	Desc    string `help:"Short description"`
-	Editor  string `help:"Editor command for this project"`
-	NoGit   bool   `help:"Skip git initialization"`
-	Adopt   bool   `help:"Adopt the directory if it already exists"`
-	NoInput bool   `help:"Never prompt; fail when information is missing"`
+	Tags    []string `name:"tag" short:"t" help:"Add tags (comma-separated or repeated)"`
+	Name    string   `arg:"" optional:"" help:"Project name"`
+	At      string   `help:"Parent directory (defaults to the working directory)"`
+	Desc    string   `help:"Short description"`
+	Editor  string   `help:"Editor command for this project"`
+	NoGit   bool     `help:"Skip git initialization"`
+	Adopt   bool     `help:"Adopt the directory if it already exists"`
+	NoInput bool     `help:"Never prompt; fail when information is missing"`
 }
 
 func (cmd *CreateCmd) Run(g *Globals) error {
@@ -39,6 +42,7 @@ func (cmd *CreateCmd) Run(g *Globals) error {
 
 	req := create.Request{
 		Name:        cmd.Name,
+		Tags:        cmd.Tags,
 		Location:    location,
 		Description: cmd.Desc,
 		Editor:      cmd.Editor,
@@ -169,6 +173,9 @@ func toPreview(p create.Plan, home string) ui.Preview {
 	if nested := p.NestedIn(); nested != "" {
 		preview.Facts = append(preview.Facts, "inside "+ui.DisplayPath(nested, home))
 	}
+	if len(p.Tags) > 0 {
+		preview.Facts = append(preview.Facts, ui.FormatTags(p.Tags))
+	}
 	if p.Editor != "" {
 		preview.Facts = append(preview.Facts, p.Editor)
 	}
@@ -189,6 +196,7 @@ func pluralFiles(n int) string {
 func toRequest(d ui.Draft) create.Request {
 	return create.Request{
 		Name:        d.Name,
+		Tags:        catalog.SplitTags(d.Tags),
 		Location:    d.Location,
 		Description: d.Description,
 		Editor:      d.Editor,
@@ -199,6 +207,7 @@ func toRequest(d ui.Draft) create.Request {
 func toDraft(r create.Request) ui.Draft {
 	return ui.Draft{
 		Name:        r.Name,
+		Tags:        strings.Join(r.Tags, ", "),
 		Location:    r.Location,
 		Description: r.Description,
 		Editor:      r.Editor,

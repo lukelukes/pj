@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
+	"pj/internal/catalog"
 	"strings"
 	"time"
 )
@@ -21,6 +22,7 @@ var (
 )
 
 type Request struct {
+	Tags        []string
 	Name        string
 	Location    string
 	Description string
@@ -60,6 +62,13 @@ func BuildPlan(req Request, env Env) Plan {
 		p.Blocker = err
 		return p
 	}
+
+	tags, err := catalog.NormalizeTags(p.Tags)
+	if err != nil {
+		p.Blocker = err
+		return p
+	}
+	p.Tags = tags
 
 	p.Path = filepath.Join(p.Location, p.Name)
 	p.attachConflicts(env)
