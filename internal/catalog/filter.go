@@ -57,6 +57,7 @@ func Apply(projects []Project, f Filter) []Project {
 }
 
 var fields = map[string]func(Project) []string{
+	"tag":    func(p Project) []string { return p.Tags },
 	"name":   func(p Project) []string { return []string{p.Name} },
 	"path":   func(p Project) []string { return []string{p.Path} },
 	"editor": func(p Project) []string { return []string{p.Editor} },

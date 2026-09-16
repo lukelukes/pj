@@ -18,6 +18,7 @@ var (
 )
 
 type Project struct {
+	Tags         []string  `yaml:"tags,omitempty"`
 	ID           string    `yaml:"id"`
 	Name         string    `yaml:"name"`
 	Path         string    `yaml:"path"`
@@ -77,5 +78,10 @@ func (p *Project) ValidateAndNormalize() error {
 		return fmt.Errorf("cannot access path %q: %w", p.Path, err)
 	}
 
+	tags, err := NormalizeTags(p.Tags)
+	if err != nil {
+		return err
+	}
+	p.Tags = tags
 	return nil
 }
