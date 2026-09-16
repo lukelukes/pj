@@ -19,7 +19,7 @@ const (
 	markerGap   = "  "
 )
 
-var labels = [fieldCount]string{"name", "where", "about", "editor", "git"}
+var labels = [fieldCount]string{"name", "where", "about", "tags", "editor", "git"}
 
 type rowState int
 

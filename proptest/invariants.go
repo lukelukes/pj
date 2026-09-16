@@ -49,7 +49,6 @@ const (
 	InvTagNormalizeIdempotent  = "INV-59"
 	InvTagsSortedUnique        = "INV-60"
 	InvLenientLoadEqualsStrict = "INV-61"
-	InvTagSugarEqualsTerm      = "INV-62"
 	InvAddRemoveTagsInverse    = "INV-63"
 	InvTagSetIsUnion           = "INV-64"
 )

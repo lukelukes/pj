@@ -1,6 +1,7 @@
 package ui
 
 type Draft struct {
+	Tags        string
 	Name        string
 	Location    string
 	Description string
