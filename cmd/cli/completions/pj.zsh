@@ -3,6 +3,10 @@ _pj_projects() {
     compadd -S '' -- $projects
 }
 
+_pj_filter_fields() {
+    compadd -S '' -- name= path= editor= desc=
+}
+
 _pj() {
     local -a commands=(
         'a:Add a project to the catalog'
@@ -14,8 +18,8 @@ _pj() {
         'open:Open project in editor'
         'e:Edit project metadata'
         'edit:Edit project metadata'
-        's:Search for projects'
-        'search:Search for projects'
+        'create:Create a new project'
+        'new:Create a new project'
         'show:Show project details'
         'cd:Change directory to project'
         'init:Generate shell integration'
@@ -39,7 +43,8 @@ _pj() {
                     ;;
                 ls|list)
                     _arguments \
-                        '(-n --names)'{-n,--names}'[Output only names]'
+                        '*'{-f,--filter}'[Filter projects]:filter:_pj_filter_fields' \
+                        '(-o --output)'{-o,--output}'[Output format]:format:(table names paths json)'
                     ;;
                 rm)
                     _arguments '1:project:_pj_projects'
@@ -49,12 +54,19 @@ _pj() {
                     ;;
                 e|edit)
                     _arguments \
-                        '--notes[Set notes]:notes:' \
+                        '--desc[Set description]:description:' \
                         '--editor[Set editor]:editor:' \
                         '1:project:_pj_projects'
                     ;;
-                s|search)
-                    _arguments '1:query:'
+                create|new)
+                    _arguments \
+                        '--at[Parent directory]:directory:_files -/' \
+                        '--desc[Project description]:description:' \
+                        '--editor[Editor command]:editor:' \
+                        '--no-git[Skip git initialization]' \
+                        '--adopt[Adopt an existing directory]' \
+                        '--no-input[Never prompt]' \
+                        '1:name:'
                     ;;
                 show)
                     _arguments \
@@ -65,7 +77,7 @@ _pj() {
                     _arguments '1:project:_pj_projects'
                     ;;
                 completion)
-                    _arguments '1:shell:(bash zsh fish)'
+                    _arguments '1:shell:(zsh)'
                     ;;
             esac
             ;;
