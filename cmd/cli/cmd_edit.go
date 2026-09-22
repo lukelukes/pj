@@ -6,11 +6,15 @@ import (
 )
 
 type EditCmd struct {
+	Desc   string `help:"Set project description"`
 	Name   string `arg:"" help:"Project name to edit" completion:"pj list -n"`
 	Editor string `help:"Set editor command (e.g., code, nvim)"`
 }
 
 func (cmd *EditCmd) applyEdits(p *catalog.Project) {
+	if cmd.Desc != "" {
+		p.Description = cmd.Desc
+	}
 	if cmd.Editor != "" {
 		p.Editor = cmd.Editor
 	}

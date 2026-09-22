@@ -9,17 +9,22 @@ import (
 )
 
 type ListCmd struct {
-	Names bool `short:"n" help:"Output only project names (one per line)"`
+	Selector `embed:""`
+	Output   Output `short:"o" enum:"table,names,paths,json" default:"table" help:"Output format: table, names, paths, json"`
+	Names    bool   `short:"n" hidden:"" help:"Alias for --output names"`
 }
 
 func (cmd *ListCmd) Run(g *Globals) error {
-	projects := g.Cat.List()
-
+	projects, err := cmd.Select(g.Cat)
+	if err != nil {
+		return err
+	}
+	output := cmd.Output
 	if cmd.Names {
-		for _, p := range projects {
-			fmt.Fprintln(g.Out, p.Name)
-		}
-		return nil
+		output = OutputNames
+	}
+	if output != "" && output != OutputTable {
+		return printProjects(g.Out, projects, output)
 	}
 
 	items := make([]render.ProjectListItem, len(projects))
@@ -36,8 +41,8 @@ func (cmd *ListCmd) Run(g *Globals) error {
 	})
 
 	view := render.ProjectListView{Items: items}
-	output := g.Render.RenderProjectList(view)
-	_, err := fmt.Fprint(g.Out, output)
+	rendered := g.Render.RenderProjectList(view)
+	_, err = fmt.Fprint(g.Out, rendered)
 	return err
 }
 
