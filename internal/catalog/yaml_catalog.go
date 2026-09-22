@@ -60,7 +60,7 @@ func (c *YAMLCatalog) Get(id string) (Project, error) {
 	if !ok {
 		return Project{}, ErrNotFound
 	}
-	return p, nil
+	return p.WithTags(p.Tags), nil
 }
 
 func (c *YAMLCatalog) GetByPath(path string) (Project, error) {
@@ -71,7 +71,8 @@ func (c *YAMLCatalog) GetByPath(path string) (Project, error) {
 	if !ok {
 		return Project{}, ErrNotFound
 	}
-	return c.projects[id], nil
+	p := c.projects[id]
+	return p.WithTags(p.Tags), nil
 }
 
 func (c *YAMLCatalog) Update(p Project) error {
@@ -123,7 +124,7 @@ func (c *YAMLCatalog) List() []Project {
 func (c *YAMLCatalog) listUnlocked() []Project {
 	projects := make([]Project, 0, len(c.projects))
 	for _, p := range c.projects {
-		projects = append(projects, p)
+		projects = append(projects, p.WithTags(p.Tags))
 	}
 	return projects
 }
@@ -141,7 +142,7 @@ func (c *YAMLCatalog) Search(query string) []Project {
 
 	for _, p := range c.projects {
 		if strings.Contains(strings.ToLower(p.Name), query) || strings.Contains(strings.ToLower(p.Path), query) {
-			results = append(results, p)
+			results = append(results, p.WithTags(p.Tags))
 		}
 	}
 
@@ -201,6 +202,7 @@ func (c *YAMLCatalog) Load() error {
 	c.byPath = make(map[string]string, len(file.Projects))
 
 	for _, p := range file.Projects {
+		p.Tags = normalizeTagsLenient(p.Tags)
 		c.projects[p.ID] = p
 		c.byPath[p.Path] = p.ID
 	}

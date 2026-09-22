@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"pj/internal/catalog"
 	"pj/proptest"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -36,7 +37,7 @@ func TestProperty_PlainProjections(t *testing.T) {
 				require.Equal(t, expected, lines[i])
 			}
 		}
-		require.True(t, slices.Equal(original, ps), "printing mutated input")
+		require.True(t, reflect.DeepEqual(original, ps), "printing mutated input")
 	})
 }
 
@@ -64,6 +65,8 @@ func TestProperty_JSONProjection(t *testing.T) {
 			require.Equal(t, p.Path, row.Path)
 			require.Equal(t, p.Editor, row.Editor)
 			require.Equal(t, p.Description, row.Description)
+			require.NotNil(t, row.Tags)
+			require.Equal(t, append([]string{}, p.Tags...), row.Tags)
 			require.True(t, p.AddedAt.Equal(row.AddedAt))
 			require.True(t, p.LastAccessed.Equal(row.LastAccessed))
 		}

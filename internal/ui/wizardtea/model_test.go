@@ -133,17 +133,18 @@ func TestStepsTickOnlyOnceYouLeaveThem(t *testing.T) {
 }
 
 func TestSkippedEmptyStepsStayUnticked(t *testing.T) {
-	m := send(t, typeText(t, newTestModel(t, stubPreview{}), "api"), "enter", "enter", "enter")
+	m := send(t, typeText(t, newTestModel(t, stubPreview{}), "api"), "enter", "enter", "enter", "enter")
 
 	assert.Equal(t, fieldEditor, m.focus)
 	assert.NotContains(t, plainLines(m.render()), markerDone+"  about:", "a step left blank is not done")
+	assert.NotContains(t, plainLines(m.render()), markerDone+"  tags:")
 }
 
 func TestEnterAdvancesUntilTheLastField(t *testing.T) {
 	t.Run("enter walks down the fields", func(t *testing.T) {
 		m := typeText(t, newTestModel(t, stubPreview{}), "api")
 
-		for _, want := range []field{fieldLocation, fieldDescription, fieldEditor, fieldGit} {
+		for _, want := range []field{fieldLocation, fieldDescription, fieldTags, fieldEditor, fieldGit} {
 			m = send(t, m, "enter")
 			require.Equal(t, want, m.focus)
 			require.False(t, m.finished, "enter must not create from the middle of the form")
@@ -287,7 +288,7 @@ func TestNavigation(t *testing.T) {
 
 	t.Run("tab wraps around every field", func(t *testing.T) {
 		m := newTestModel(t, stubPreview{})
-		want := []field{fieldLocation, fieldDescription, fieldEditor, fieldGit, fieldName}
+		want := []field{fieldLocation, fieldDescription, fieldTags, fieldEditor, fieldGit, fieldName}
 
 		for _, expected := range want {
 			m = send(t, m, "tab")
@@ -322,4 +323,16 @@ func TestFinishedModelRendersNothing(t *testing.T) {
 	m := commit(t, typeText(t, newTestModel(t, stubPreview{}), "api"))
 
 	assert.Empty(t, m.render(), "the wizard must leave no frame behind once it commits")
+}
+
+func TestTagsFieldPreservesInputOnSubmit(t *testing.T) {
+	m := newModel(ui.Session{Draft: ui.Draft{Name: "api", Location: "/dev", Tags: "work"}}, plainPalette())
+	m.Init()
+	m = send(t, m, "tab", "tab", "tab")
+	require.Equal(t, fieldTags, m.focus)
+	m = typeText(t, m, ", lang:go")
+	require.Equal(t, "work, lang:go", m.draft().Tags)
+	m = send(t, m, "enter", "enter", "enter")
+	require.True(t, m.finished)
+	require.Equal(t, "work, lang:go", m.outcome.Draft.Tags)
 }

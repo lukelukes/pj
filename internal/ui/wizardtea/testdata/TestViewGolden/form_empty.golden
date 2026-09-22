@@ -1,6 +1,7 @@
 →  name:
 │  where:    ~/dev
 │  about:    what is it for
+│  tags:     lang:go, cli
 │  editor:   nvim                             inherited
 │  git:      ● init  ○ skip
 │

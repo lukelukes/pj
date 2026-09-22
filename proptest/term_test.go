@@ -3,6 +3,7 @@ package proptest
 import (
 	"errors"
 	"pj/internal/catalog"
+	"slices"
 	"strings"
 	"testing"
 
@@ -43,16 +44,18 @@ func TestTermCompleteness(t *testing.T) {
 	}
 }
 
-func projectField(p catalog.Project, field string) string {
+func projectField(p catalog.Project, field string) []string {
 	switch field {
+	case "tag":
+		return p.Tags
 	case "name":
-		return p.Name
+		return []string{p.Name}
 	case "path":
-		return p.Path
+		return []string{p.Path}
 	case "editor":
-		return p.Editor
+		return []string{p.Editor}
 	case "desc":
-		return p.Description
+		return []string{p.Description}
 	default:
 		panic("missing generated field: " + field)
 	}
@@ -75,26 +78,29 @@ func TestProperty_TermSelfMatch(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		p, other := projectGen.Draw(t, "project"), projectGen.Draw(t, "other")
 		for _, field := range catalog.FilterFields() {
-			value := projectField(p, field)
-			require.Len(t, catalog.Apply([]catalog.Project{p}, catalog.Term{Field: field, Op: "=", Value: value}.Filter()), 1, InvExactSelfMatch)
-			require.Equal(t, value == projectField(other, field), catalog.Term{Field: field, Op: "=", Value: value}.Filter()(other), InvExactSelfMatch)
-			start := rapid.IntRange(0, len(value)).Draw(t, "start")
-			end := rapid.IntRange(start, len(value)).Draw(t, "end")
-			sub := value[start:end]
-			require.Len(t, catalog.Apply([]catalog.Project{p}, catalog.Term{Field: field, Op: "~", Value: sub}.Filter()), 1, InvSubstringSelfMatch)
-			require.True(t, catalog.Term{Field: field, Op: "~"}.Filter()(p), InvSubstringSelfMatch)
-			require.Equal(t, catalog.Term{Field: field, Op: "~", Value: sub}.Filter()(other), catalog.Term{Field: field, Op: "~", Value: strings.ToUpper(sub)}.Filter()(other), InvSubstringCaseInsens)
-			require.True(t, catalog.Term{Field: field, Op: "~", Value: strings.ToUpper(sub)}.Filter()(p), InvSubstringCaseInsens)
-			// path.Match wildcards cannot span a slash; replace within the final segment.
-			base := strings.LastIndex(value, "/") + 1
-			a := rapid.IntRange(base, len(value)).Draw(t, "globStart")
-			b := rapid.IntRange(a, len(value)).Draw(t, "globEnd")
-			glob := value[:a] + "*" + value[b:]
-			require.Len(t, catalog.Apply([]catalog.Project{p}, catalog.Term{Field: field, Op: "=", Value: glob}.Filter()), 1, InvGlobSelfMatch)
-			if base < len(value) {
-				i := rapid.IntRange(base, len(value)-1).Draw(t, "questionIndex")
-				glob = value[:i] + "?" + value[i+1:]
-				require.True(t, catalog.Term{Field: field, Op: "=", Value: glob}.Filter()(p), InvGlobSelfMatch)
+			values := projectField(p, field)
+			require.Equal(t, len(values) > 0, catalog.Term{Field: field, Op: "~"}.Filter()(p), InvSubstringSelfMatch)
+			for _, value := range values {
+				require.Len(t, catalog.Apply([]catalog.Project{p}, catalog.Term{Field: field, Op: "=", Value: value}.Filter()), 1, InvExactSelfMatch)
+				require.Equal(t, slices.Contains(projectField(other, field), value), catalog.Term{Field: field, Op: "=", Value: value}.Filter()(other), InvExactSelfMatch)
+				start := rapid.IntRange(0, len(value)).Draw(t, "start")
+				end := rapid.IntRange(start, len(value)).Draw(t, "end")
+				sub := value[start:end]
+				require.Len(t, catalog.Apply([]catalog.Project{p}, catalog.Term{Field: field, Op: "~", Value: sub}.Filter()), 1, InvSubstringSelfMatch)
+				require.True(t, catalog.Term{Field: field, Op: "~"}.Filter()(p), InvSubstringSelfMatch)
+				require.Equal(t, catalog.Term{Field: field, Op: "~", Value: sub}.Filter()(other), catalog.Term{Field: field, Op: "~", Value: strings.ToUpper(sub)}.Filter()(other), InvSubstringCaseInsens)
+				require.True(t, catalog.Term{Field: field, Op: "~", Value: strings.ToUpper(sub)}.Filter()(p), InvSubstringCaseInsens)
+				// path.Match wildcards cannot span a slash; replace within the final segment.
+				base := strings.LastIndex(value, "/") + 1
+				a := rapid.IntRange(base, len(value)).Draw(t, "globStart")
+				b := rapid.IntRange(a, len(value)).Draw(t, "globEnd")
+				glob := value[:a] + "*" + value[b:]
+				require.Len(t, catalog.Apply([]catalog.Project{p}, catalog.Term{Field: field, Op: "=", Value: glob}.Filter()), 1, InvGlobSelfMatch)
+				if base < len(value) {
+					i := rapid.IntRange(base, len(value)-1).Draw(t, "questionIndex")
+					glob = value[:i] + "?" + value[i+1:]
+					require.True(t, catalog.Term{Field: field, Op: "=", Value: glob}.Filter()(p), InvGlobSelfMatch)
+				}
 			}
 		}
 	})
@@ -142,6 +148,12 @@ func TestGenerators_Coverage(t *testing.T) {
 			}
 		}
 		p := projectGen.Example(i)
+		if len(p.Tags) == 0 {
+			buckets["emptyTags"] = true
+		}
+		if len(p.Tags) > 1 {
+			buckets["multipleTags"] = true
+		}
 		if p.Editor == "" {
 			buckets["emptyEditor"] = true
 		}
@@ -160,7 +172,7 @@ func TestGenerators_Coverage(t *testing.T) {
 			buckets["not"] = true
 		}
 	}
-	expected := []string{"empty", "glob", "=", "~", "!", "emptyEditor", "description", "bareTerm", "emptyAnd", "not"}
+	expected := []string{"field:tag", "emptyTags", "multipleTags", "empty", "glob", "=", "~", "!", "emptyEditor", "description", "bareTerm", "emptyAnd", "not"}
 	for _, field := range catalog.FilterFields() {
 		expected = append(expected, "field:"+field)
 	}

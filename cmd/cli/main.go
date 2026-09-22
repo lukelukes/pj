@@ -17,6 +17,7 @@ var (
 )
 
 type CLI struct {
+	Tag        TagCmd        `cmd:"" help:"Manage project tags"`
 	Add        AddCmd        `cmd:"" aliases:"a" help:"Add a project to the catalog"`
 	Create     CreateCmd     `cmd:"" aliases:"new" help:"Create a new project interactively"`
 	List       ListCmd       `cmd:"" aliases:"ls" help:"List projects in the catalog"`

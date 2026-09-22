@@ -879,6 +879,19 @@ func TestKongAliases(t *testing.T) {
 }
 
 func TestListCmd_GoldenOutput(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		age  time.Duration
+	}{{"with_tags", time.Hour}, {"stale_with_tags", 90 * 24 * time.Hour}} {
+		t.Run(tc.name, func(t *testing.T) {
+			g, out, paths := newGoldenTestGlobals(t)
+			addProjectWithTime(t, g, paths, "pj", "Project tracker", testFixedNow.Add(-tc.age))
+			p := g.Cat.List()[0].WithTags([]string{"cli", "lang:go"})
+			require.NoError(t, g.Cat.Update(p))
+			require.NoError(t, (&ListCmd{}).Run(g))
+			golden.RequireEqual(t, []byte(normalizePaths(out.String(), paths)))
+		})
+	}
 	t.Run("empty list", func(t *testing.T) {
 		g, out, _ := newGoldenTestGlobals(t)
 

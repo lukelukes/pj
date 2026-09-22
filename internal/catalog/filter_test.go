@@ -12,7 +12,7 @@ func TestParseTermErrors(t *testing.T) {
 		err  error
 		text string
 	}{
-		{"bogus=1", ErrUnknownField, "desc, editor, name, path"},
+		{"bogus=1", ErrUnknownField, "desc, editor, name, path, tag"},
 		{"name>x", ErrUnknownOp, "=, !=, ~, !~"},
 		{"name=a[b", ErrBadGlob, "a[b"},
 		{"name!=[", ErrBadGlob, "["},
