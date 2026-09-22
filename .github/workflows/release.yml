@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 concurrency:
   group: release
@@ -34,32 +35,91 @@ jobs:
             exit 1
           fi
 
+      # CI already runs Verify and Lint on every master push, so the release
+      # only checks that this exact commit has a green CI run instead of
+      # repeating the work. Waits up to 10 minutes if CI is still running.
+      - name: Require a passing CI run for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha="$(git rev-parse HEAD)"
+          for attempt in $(seq 1 40); do
+            runs="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${sha}&per_page=20" \
+              --jq '.workflow_runs[] | "\(.status) \(.conclusion) \(.html_url)"')"
+            if grep -q '^completed success' <<<"$runs"; then
+              echo "CI passed for ${sha}: $(grep -m1 '^completed success' <<<"$runs" | awk '{print $3}')"
+              exit 0
+            fi
+            if grep -Eq '^(queued|in_progress|waiting|pending|requested)' <<<"$runs"; then
+              echo "CI still running for ${sha}, waiting (attempt ${attempt}/40)"
+              sleep 15
+              continue
+            fi
+            break
+          done
+          echo "::error::No successful CI run found for ${sha}. Runs found:"
+          echo "${runs:-<none>}"
+          exit 1
+
       - name: Set up Go
-        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c #v6.1.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e #v7.0.0
         with:
           go-version-file: go.mod
-          cache: true
+          cache: false
 
-      - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest
-
-      - name: Verify
-        run: make verify-ci
-
-      - name: Lint
-        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 #v9.2.0
+      # Own key so the cache holds goreleaser's cross-compiled builds;
+      # falls back to the CI verify cache when no release cache exists yet.
+      - name: Cache Go modules and build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 #v6.1.0
         with:
-          version: v2.13.2
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-release-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}
+          restore-keys: |
+            go-release-${{ runner.os }}-
+            go-verify-${{ runner.os }}-
 
+      # Runs the semantic-release CLI directly instead of via
+      # go-semantic-release/action, which is unmaintained (still on Node 20)
+      # and downloads an unpinned binary. Same flags and outputs as the action.
       - name: Semantic Release
-        uses: go-semantic-release/action@2e9dc4247a6004f8377781bef4cb9dad273a741f #v1.24.1
         id: semantic
-        with:
-          hooks: goreleaser
-          allow-initial-development-versions: true
-          dry: ${{ inputs.dry_run }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SEMREL_VERSION: v2.31.0
+          SEMREL_SHA256: b8f518b1aeb1d1742f4e6e91a179b707cea4309a64fe3854f465bf724f04f6d3
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          bin="${RUNNER_TEMP}/semantic-release"
+          curl -sSfL --retry 3 -o "$bin" \
+            "https://github.com/go-semantic-release/semantic-release/releases/download/${SEMREL_VERSION}/semantic-release_${SEMREL_VERSION}_linux_amd64"
+          echo "${SEMREL_SHA256}  ${bin}" | sha256sum --check --strict -
+          chmod +x "$bin"
+
+          args=(
+            --version-file
+            --changelog .generated-go-semantic-release-changelog.md
+            --allow-initial-development-versions
+            --hooks goreleaser
+          )
+          version_file=.version
+          if [ "$DRY_RUN" = "true" ]; then
+            args+=(--dry)
+            version_file=.version-unreleased
+          fi
+
+          rc=0
+          "$bin" "${args[@]}" || rc=$?
+          case "$rc" in
+            0) ;;
+            65) echo "::notice::No release: no releasable commits since the last release"; exit 0 ;;
+            66) echo "::notice::No release: CI condition not met"; exit 0 ;;
+            *) exit "$rc" ;;
+          esac
+
+          echo "version=$(cat "$version_file")" >> "$GITHUB_OUTPUT"
+          rm -f "$version_file"
 
       - name: Release info
         if: steps.semantic.outputs.version != ''

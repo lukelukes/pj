@@ -15,6 +15,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
+env:
+  GOVULNCHECK_VERSION: v1.8.0
+
 jobs:
   verify:
     name: Verify
@@ -25,13 +28,26 @@ jobs:
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 #v6.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c #v6.1.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e #v7.0.0
         with:
           go-version-file: go.mod
-          cache: true
+          cache: false
+
+      # setup-go's built-in cache keys only on go.sum, so every job in the repo
+      # shares one entry and whichever finishes first (Lint) wins - leaving the
+      # build cache empty for the jobs that compile. Key this cache per job.
+      - name: Cache Go modules and build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 #v6.1.0
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-verify-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}-govulncheck-${{ env.GOVULNCHECK_VERSION }}
+          restore-keys: |
+            go-verify-${{ runner.os }}-
 
       - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+        run: go install golang.org/x/vuln/cmd/govulncheck@${{ env.GOVULNCHECK_VERSION }}
 
       - name: Verify
         run: make verify-ci
@@ -45,7 +61,7 @@ jobs:
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 #v6.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c #v6.1.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e #v7.0.0
         with:
           go-version-file: go.mod
           cache: true
