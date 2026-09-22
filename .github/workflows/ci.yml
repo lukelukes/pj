@@ -4,6 +4,8 @@ on:
   pull_request:
     branches:
       - master
+    paths-ignore:
+      - "**.md"
   push:
     branches:
       - master
@@ -36,21 +38,40 @@ jobs:
       # setup-go's built-in cache keys only on go.sum, so every job in the repo
       # shares one entry and whichever finishes first (Lint) wins - leaving the
       # build cache empty for the jobs that compile. Key this cache per job.
-      - name: Cache Go modules and build cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 #v6.1.0
+      - name: Restore Go modules, build cache and tools
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 #v6.1.0
         with:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: go-verify-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}-govulncheck-${{ env.GOVULNCHECK_VERSION }}
+            ~/go/bin
+          key: go-verify-${{ runner.os }}-govulncheck-${{ env.GOVULNCHECK_VERSION }}-${{ hashFiles('go.mod', 'go.sum') }}-${{ github.run_id }}
           restore-keys: |
+            go-verify-${{ runner.os }}-govulncheck-${{ env.GOVULNCHECK_VERSION }}-${{ hashFiles('go.mod', 'go.sum') }}-
+            go-verify-${{ runner.os }}-govulncheck-${{ env.GOVULNCHECK_VERSION }}-
             go-verify-${{ runner.os }}-
 
       - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@${{ env.GOVULNCHECK_VERSION }}
+        run: |
+          bin="$(go env GOPATH)/bin/govulncheck"
+          if [ -x "$bin" ] && go version -m "$bin" | grep -Eq "^\s*mod\s+golang.org/x/vuln\s+${GOVULNCHECK_VERSION}\s"; then
+            echo "govulncheck ${GOVULNCHECK_VERSION} restored from cache"
+          else
+            go install "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}"
+          fi
 
       - name: Verify
         run: make verify-ci
+
+      - name: Save Go modules, build cache and tools
+        if: ${{ !cancelled() && github.ref == 'refs/heads/master' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 #v6.1.0
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+            ~/go/bin
+          key: go-verify-${{ runner.os }}-govulncheck-${{ env.GOVULNCHECK_VERSION }}-${{ hashFiles('go.mod', 'go.sum') }}-${{ github.run_id }}
 
   lint:
     name: Lint

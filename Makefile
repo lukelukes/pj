@@ -47,7 +47,9 @@ test-integration: ## Run integration tests
 	echo "No integration tests yet"
 
 .PHONY: test-all
-test-all: test test-property test-integration ## Run all tests
+test-all: ## Run all tests
+	go test -race $(TESTFLAGS) ./internal/... ./cmd/... ./proptest
+	@$(MAKE) test-integration
 
 .PHONY: bench
 bench: ## Run benchmarks
@@ -147,13 +149,13 @@ mod-verify: ## Verify dependencies haven't been tampered with
 	@go mod verify
 
 .PHONY: verify-dev
-verify-dev: build ## Run all quality checks - in local dev
-	@$(MAKE) -j4 lint fmt-check vet vuln tidy mod-verify
+verify-dev: ## Run all quality checks - in local dev
+	@$(MAKE) -j4 build lint fmt-check vet vuln tidy mod-verify
 	@$(MAKE) test-all
 
 .PHONY: verify-ci
-verify-ci: build ## Run all quality checks - in CI
-	@$(MAKE) -j4 vet vuln tidy-check mod-verify
+verify-ci: ## Run all quality checks - in CI
+	@$(MAKE) -j4 build vet vuln tidy-check mod-verify
 	@$(MAKE) test-all TESTFLAGS="-count=1"
 
 ##@ Release
