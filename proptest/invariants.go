@@ -46,6 +46,7 @@ const (
 	InvSelectorOrderIrrelevant = "INV-45"
 	InvProjectionLineCount     = "INV-46"
 	InvJSONRoundTrip           = "INV-47"
+	InvTermCompileValidates    = "INV-48"
 	InvSaveLoadRoundTrip       = "INV-50"
 )
 

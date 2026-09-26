@@ -66,10 +66,53 @@ var fields = map[string]func(Project) []string{
 // FilterFields returns the supported field names in sorted order.
 func FilterFields() []string { return slices.Sorted(maps.Keys(fields)) }
 
-// Term is a field, operator and verbatim value. Use ParseTerm to validate input.
-type Term struct{ Field, Op, Value string }
+// Op is a filter operator.
+type Op string
 
-func (t Term) String() string { return t.Field + t.Op + t.Value }
+const (
+	OpEqual       Op = "="
+	OpNotEqual    Op = "!="
+	OpContains    Op = "~"
+	OpNotContains Op = "!~"
+)
+
+type opSpec struct {
+	op                 Op
+	negated, substring bool
+}
+
+var ops = []opSpec{
+	{OpEqual, false, false},
+	{OpNotEqual, true, false},
+	{OpContains, false, true},
+	{OpNotContains, true, true},
+}
+
+// FilterOps returns the supported operators.
+func FilterOps() []Op {
+	result := make([]Op, len(ops))
+	for i, o := range ops {
+		result[i] = o.op
+	}
+	return result
+}
+
+func joinOps() string {
+	names := make([]string, len(ops))
+	for i, o := range ops {
+		names[i] = string(o.op)
+	}
+	return strings.Join(names, ", ")
+}
+
+// Term is a field, operator and verbatim value. Compile validates it.
+type Term struct {
+	Field string
+	Op    Op
+	Value string
+}
+
+func (t Term) String() string { return t.Field + string(t.Op) + t.Value }
 
 // ParseTerm parses field op value, preserving everything after the operator.
 func ParseTerm(raw string) (Term, error) {
@@ -77,48 +120,52 @@ func ParseTerm(raw string) (Term, error) {
 	for i < len(raw) && raw[i] >= 'a' && raw[i] <= 'z' {
 		i++
 	}
-	field := raw[:i]
-	if _, ok := fields[field]; !ok {
-		return Term{}, fmt.Errorf("%w %q in %q (valid fields: %s)", ErrUnknownField, field, raw, strings.Join(FilterFields(), ", "))
-	}
-	for _, op := range []string{"!=", "!~", "=", "~"} {
-		if strings.HasPrefix(raw[i:], op) {
-			term := Term{Field: field, Op: op, Value: raw[i+len(op):]}
-			if err := term.validateGlob(); err != nil {
-				return Term{}, err
-			}
-			return term, nil
+	rest := raw[i:]
+	op := Op(rest)
+	for _, o := range ops {
+		if strings.HasPrefix(rest, string(o.op)) {
+			op = o.op
+			break
 		}
 	}
-	return Term{}, fmt.Errorf("%w %q in %q (valid operators: =, !=, ~, !~)", ErrUnknownOp, raw[i:], raw)
+	term := Term{Field: raw[:i], Op: op, Value: rest[len(op):]}
+	if _, err := term.Compile(); err != nil {
+		return Term{}, fmt.Errorf("%w in %q", err, raw)
+	}
+	return term, nil
 }
 
-func (t Term) validateGlob() error {
-	if (t.Op == "=" || t.Op == "!=") && strings.ContainsAny(t.Value, "*?[") {
-		if _, err := path.Match(t.Value, ""); err != nil {
-			return fmt.Errorf("%w %q: %v", ErrBadGlob, t.Value, err)
-		}
+// Compile validates the term and returns its filter. Negation complements the whole field match.
+func (t Term) Compile() (Filter, error) {
+	get, ok := fields[t.Field]
+	if !ok {
+		return nil, fmt.Errorf("%w %q (valid fields: %s)", ErrUnknownField, t.Field, strings.Join(FilterFields(), ", "))
 	}
-	return nil
+	i := slices.IndexFunc(ops, func(o opSpec) bool { return o.op == t.Op })
+	if i < 0 {
+		return nil, fmt.Errorf("%w %q (valid operators: %s)", ErrUnknownOp, t.Op, joinOps())
+	}
+	match, err := matcher(t.Value, ops[i].substring)
+	if err != nil {
+		return nil, err
+	}
+	f := func(p Project) bool { return slices.ContainsFunc(get(p), match) }
+	if ops[i].negated {
+		return Not(f), nil
+	}
+	return f, nil
 }
 
-// Filter compiles a valid term. Negation complements the whole field match.
-func (t Term) Filter() Filter {
-	match := t.matcher()
-	f := func(p Project) bool { return slices.ContainsFunc(fields[t.Field](p), match) }
-	if t.Op == "!=" || t.Op == "!~" {
-		return Not(f)
+func matcher(value string, substring bool) (func(string) bool, error) {
+	if substring {
+		value = strings.ToLower(value)
+		return func(s string) bool { return strings.Contains(strings.ToLower(s), value) }, nil
 	}
-	return f
-}
-
-func (t Term) matcher() func(string) bool {
-	if t.Op == "~" || t.Op == "!~" {
-		value := strings.ToLower(t.Value)
-		return func(s string) bool { return strings.Contains(strings.ToLower(s), value) }
+	if !strings.ContainsAny(value, "*?[") {
+		return func(s string) bool { return s == value }, nil
 	}
-	if strings.ContainsAny(t.Value, "*?[") {
-		return func(s string) bool { matched, _ := path.Match(t.Value, s); return matched }
+	if _, err := path.Match(value, ""); err != nil {
+		return nil, fmt.Errorf("%w %q: %v", ErrBadGlob, value, err)
 	}
-	return func(s string) bool { return s == t.Value }
+	return func(s string) bool { matched, _ := path.Match(value, s); return matched }, nil
 }

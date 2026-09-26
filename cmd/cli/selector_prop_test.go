@@ -28,7 +28,8 @@ func TestProperty_Selector(t *testing.T) {
 			raw[i] = term.String()
 			parsed, err := catalog.ParseTerm(raw[i])
 			require.NoError(t, err)
-			filters[i] = parsed.Filter()
+			filters[i], err = parsed.Compile()
+			require.NoError(t, err)
 		}
 		selector := Selector{Filters: raw}
 		f, err := selector.Filter()

@@ -115,7 +115,7 @@ projects:
 
 var (
 	fieldNameGen     = rapid.SampledFrom(catalog.FilterFields())
-	opGen            = rapid.SampledFrom([]string{"=", "!=", "~", "!~"})
+	opGen            = rapid.SampledFrom(catalog.FilterOps())
 	optionalFieldGen = rapid.OneOf(rapid.Just(""), rapid.StringMatching(`[a-m]{1,10}`))
 	termValueGen     = rapid.OneOf(
 		rapid.Just(""), rapid.StringMatching(`[a-m0-9]{1,8}`),
@@ -170,7 +170,7 @@ func filterTreeGen(depth int) *rapid.Generator[generatedFilter] {
 			kind = rapid.SampledFrom([]string{"term", "and", "or", "not"}).Draw(t, "kind")
 		}
 		if kind == "term" {
-			return generatedFilter{filter: termGen.Draw(t, "term").Filter(), root: kind}
+			return generatedFilter{filter: mustCompile(t, termGen.Draw(t, "term")), root: kind}
 		}
 		if kind == "not" {
 			child := filterTreeGen(depth-1).Draw(t, "child")

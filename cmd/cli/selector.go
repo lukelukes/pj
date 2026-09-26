@@ -17,7 +17,11 @@ func (s Selector) Filter() (catalog.Filter, error) {
 		if err != nil {
 			return nil, err
 		}
-		filters = append(filters, term.Filter())
+		f, err := term.Compile()
+		if err != nil {
+			return nil, err
+		}
+		filters = append(filters, f)
 	}
 	return catalog.And(filters...), nil
 }

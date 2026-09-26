@@ -58,3 +58,12 @@ func assertNoDuplicatePaths(t *rapid.T, projects []catalog.Project) {
 		paths[p.Path] = true
 	}
 }
+
+func mustCompile(t *rapid.T, term catalog.Term) catalog.Filter {
+	t.Helper()
+	f, err := term.Compile()
+	if err != nil {
+		t.Fatalf("compile %q: %v", term, err)
+	}
+	return f
+}

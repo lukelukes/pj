@@ -42,7 +42,31 @@ func TestTermMatching(t *testing.T) {
 		t.Run(tc.raw, func(t *testing.T) {
 			term, err := ParseTerm(tc.raw)
 			require.NoError(t, err)
-			require.Equal(t, tc.want, term.Filter()(tc.project))
+			f, err := term.Compile()
+			require.NoError(t, err)
+			require.Equal(t, tc.want, f(tc.project))
+		})
+	}
+}
+
+func TestCompileRejectsInvalidTerms(t *testing.T) {
+	for _, tc := range []struct {
+		term Term
+		err  error
+		text string
+	}{
+		{Term{}, ErrUnknownField, "desc, editor, name, path"},
+		{Term{Field: "bogus", Op: OpEqual}, ErrUnknownField, "bogus"},
+		{Term{Field: "name"}, ErrUnknownOp, "=, !=, ~, !~"},
+		{Term{Field: "name", Op: "x"}, ErrUnknownOp, `"x"`},
+		{Term{Field: "name", Op: OpEqual, Value: "["}, ErrBadGlob, "["},
+		{Term{Field: "name", Op: OpNotEqual, Value: "["}, ErrBadGlob, "["},
+	} {
+		t.Run(tc.term.String(), func(t *testing.T) {
+			f, err := tc.term.Compile()
+			require.Nil(t, f)
+			require.ErrorIs(t, err, tc.err)
+			require.ErrorContains(t, err, tc.text)
 		})
 	}
 }
