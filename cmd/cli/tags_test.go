@@ -122,6 +122,30 @@ func TestTagQueryMatchesStoredForm(t *testing.T) {
 	}
 }
 
+func TestHandEditedTagsLoadNormalizedOrFail(t *testing.T) {
+	g, _ := newTestGlobals(t)
+	dir := t.TempDir()
+	path := filepath.Join(t.TempDir(), "catalog.yaml")
+	write := func(tags string) {
+		require.NoError(t, os.WriteFile(path, []byte("version: 1\nprojects:\n  - id: p\n    name: proj\n    path: "+dir+"\n    tags: "+tags+"\n"), 0o600))
+	}
+	cat, err := catalog.NewYAMLCatalog(path)
+	require.NoError(t, err)
+	g.Cat = cat
+	write("[' CLI ', 'Lang:GO']")
+	require.NoError(t, g.Cat.Load())
+	require.NoError(t, (&OpenCmd{Name: "proj"}).Run(g))
+	require.NoError(t, (&EditCmd{Name: "proj", Desc: new("hi")}).Run(g))
+	require.NoError(t, (&EditCmd{Name: "proj", Untag: []string{"CLI"}}).Run(g))
+	require.NoError(t, g.Cat.Load())
+	require.Equal(t, []string{"lang:go"}, g.Cat.List()[0].Tags)
+	write("[cli, 'Bad Tag']")
+	err = g.Cat.Load()
+	require.ErrorIs(t, err, catalog.ErrInvalidTag)
+	require.ErrorContains(t, err, `project "proj"`)
+	require.ErrorContains(t, err, `"bad tag"`)
+}
+
 func TestProperty_TagProjection(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		ps := proptest.ProjectsGen().Draw(t, "projects")

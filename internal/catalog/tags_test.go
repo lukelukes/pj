@@ -60,20 +60,47 @@ func TestNormalizeAndParseTags(t *testing.T) {
 	require.Equal(t, []string{"cli"}, p.Tags)
 }
 
-func TestLoadTagsLenientAndOmitEmpty(t *testing.T) {
+func TestLoadTagsNormalizeAndOmitEmpty(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "catalog.yaml")
-	require.NoError(t, os.WriteFile(path, []byte("version: 1\nprojects:\n  - id: p\n    name: p\n    path: /missing\n    tags: [CLI, ' cli ', 'Bad!', '', '  ']\n  - id: empty\n    name: empty\n    path: /empty\n"), 0o600))
+	require.NoError(t, os.WriteFile(path, []byte("version: 1\nprojects:\n  - id: p\n    name: p\n    path: /missing\n    tags: [CLI, ' cli ', 'Lang:GO']\n  - id: empty\n    name: empty\n    path: /empty\n"), 0o600))
 	cat, err := NewYAMLCatalog(path)
 	require.NoError(t, err)
 	require.NoError(t, cat.Load())
 	p, err := cat.Get("p")
 	require.NoError(t, err)
-	require.Equal(t, []string{"bad!", "cli"}, p.Tags)
+	require.Equal(t, []string{"cli", "lang:go"}, p.Tags)
 	require.NoError(t, cat.Save())
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
 	require.Contains(t, string(data), "version: 1")
 	require.Equal(t, 1, strings.Count(string(data), "tags:"))
+}
+
+func TestLoadRejectsInvalidTags(t *testing.T) {
+	for _, tc := range []struct {
+		tags string
+		err  error
+	}{
+		{"[cli, 'Bad Tag']", ErrInvalidTag},
+		{"['bad!']", ErrInvalidTag},
+		{"[cli, '']", ErrEmptyTag},
+		{"['  ']", ErrEmptyTag},
+	} {
+		t.Run(tc.tags, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "catalog.yaml")
+			cat, err := NewYAMLCatalog(path)
+			require.NoError(t, err)
+			require.NoError(t, os.WriteFile(path, []byte("version: 1\nprojects:\n  - id: ok\n    name: ok\n    path: /ok\n"), 0o600))
+			require.NoError(t, cat.Load())
+			require.NoError(t, os.WriteFile(path, []byte("version: 1\nprojects:\n  - id: p\n    name: proj\n    path: /missing\n    tags: "+tc.tags+"\n"), 0o600))
+			err = cat.Load()
+			require.ErrorIs(t, err, tc.err)
+			require.ErrorContains(t, err, `project "proj"`)
+			require.Equal(t, 1, cat.Count())
+			_, err = cat.Get("ok")
+			require.NoError(t, err)
+		})
+	}
 }
 
 func TestCatalogTagsDoNotAlias(t *testing.T) {

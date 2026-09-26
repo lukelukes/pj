@@ -198,14 +198,20 @@ func (c *YAMLCatalog) Load() error {
 		return fmt.Errorf("failed to parse catalog file %q: %w", c.path, err)
 	}
 
-	c.projects = make(map[string]Project, len(file.Projects))
-	c.byPath = make(map[string]string, len(file.Projects))
+	projects := make(map[string]Project, len(file.Projects))
+	byPath := make(map[string]string, len(file.Projects))
 
 	for _, p := range file.Projects {
-		p.Tags = normalizeTagsLenient(p.Tags)
-		c.projects[p.ID] = p
-		c.byPath[p.Path] = p.ID
+		tags, err := NormalizeTags(p.Tags)
+		if err != nil {
+			return fmt.Errorf("invalid catalog file %q: project %q: %w", c.path, p.Name, err)
+		}
+		p.Tags = tags
+		projects[p.ID] = p
+		byPath[p.Path] = p.ID
 	}
 
+	c.projects = projects
+	c.byPath = byPath
 	return nil
 }

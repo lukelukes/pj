@@ -48,7 +48,7 @@ const (
 	InvSaveLoadRoundTrip       = "INV-50"
 	InvTagNormalizeIdempotent  = "INV-59"
 	InvTagsSortedUnique        = "INV-60"
-	InvLenientLoadEqualsStrict = "INV-61"
+	InvLoadTagsStrict          = "INV-61"
 	InvAddRemoveTagsInverse    = "INV-63"
 	InvTagSetIsUnion           = "INV-64"
 )

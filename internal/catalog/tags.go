@@ -39,17 +39,6 @@ func NormalizeTags(tags []string) ([]string, error) {
 	return sortedTags(normalized), nil
 }
 
-func normalizeTagsLenient(tags []string) []string {
-	normalized := make([]string, 0, len(tags))
-	for _, tag := range tags {
-		tag = strings.ToLower(strings.TrimSpace(tag))
-		if tag != "" {
-			normalized = append(normalized, tag)
-		}
-	}
-	return sortedTags(normalized)
-}
-
 func sortedTags(tags []string) []string {
 	if len(tags) == 0 {
 		return nil

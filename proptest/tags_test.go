@@ -1,6 +1,7 @@
 package proptest
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -96,11 +97,17 @@ func TestProperty_TagsCatalogNormalization(t *testing.T) {
 	})
 }
 
-func TestProperty_LenientTagsLoad(t *testing.T) {
+func TestProperty_LoadTagsStrict(t *testing.T) {
 	RunBasic(t, func(h *Harness) {
 		raw := rawTags(h.T)
-		want, err := catalog.NormalizeTags(raw)
-		require.NoError(h.T, err)
+		if rapid.Bool().Draw(h.T, "invalid") {
+			bad := rapid.OneOf(
+				rapid.SampledFrom([]string{"", "  ", "Bad Tag", "bad!", "lang:", "-x", "_x"}),
+				rapid.StringMatching(`[ A-Za-z0-9_.:/+!@#-]{0,6}`),
+			).Draw(h.T, "bad")
+			raw = Permute(h.T, append(raw, bad))
+		}
+		want, wantErr := catalog.NormalizeTags(raw)
 		var yaml strings.Builder
 		yaml.WriteString("version: 1\nprojects:\n  - id: p\n    name: p\n    path: /missing\n    tags:\n")
 		for _, tag := range raw {
@@ -110,9 +117,21 @@ func TestProperty_LenientTagsLoad(t *testing.T) {
 		require.NoError(h.T, os.WriteFile(path, []byte(yaml.String()), 0o600))
 		cat, err := catalog.NewYAMLCatalog(path)
 		require.NoError(h.T, err)
-		require.NoError(h.T, cat.Load())
+		err = cat.Load()
+		if wantErr != nil {
+			require.True(h.T, errors.Is(err, catalog.ErrInvalidTag) || errors.Is(err, catalog.ErrEmptyTag), InvLoadTagsStrict)
+			require.ErrorContains(h.T, err, wantErr.Error(), InvLoadTagsStrict)
+			_, err = cat.Get("p")
+			require.ErrorIs(h.T, err, catalog.ErrNotFound, InvLoadTagsStrict)
+			return
+		}
+		require.NoError(h.T, err, InvLoadTagsStrict)
 		got, err := cat.Get("p")
 		require.NoError(h.T, err)
-		require.Equal(h.T, want, got.Tags, InvLenientLoadEqualsStrict)
+		require.Equal(h.T, want, got.Tags, InvLoadTagsStrict)
+		for _, tag := range got.Tags {
+			_, err := catalog.NormalizeTag(tag)
+			require.NoError(h.T, err, InvLoadTagsStrict)
+		}
 	})
 }
