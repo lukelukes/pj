@@ -110,6 +110,18 @@ func TestCreateTags(t *testing.T) {
 	require.Contains(t, preview.Facts, "#cli #lang:go")
 }
 
+func TestTagQueryMatchesStoredForm(t *testing.T) {
+	g, out := newTestGlobals(t)
+	createTestProject(t, g, "proj")
+	createTestProject(t, g, "other")
+	require.NoError(t, (&EditCmd{Name: "proj", Tags: []string{"CLI", "Lang:GO"}}).Run(g))
+	for _, filter := range []string{"tag:CLI", `tag:" cli "`, "tag:LANG:*", "tag:lang:g?", "tag:Lang:GO"} {
+		out.Reset()
+		require.NoError(t, (&ListCmd{Selector: Selector{Filters: []string{filter}}, Names: true}).Run(g))
+		require.Equal(t, "proj\n", out.String(), filter)
+	}
+}
+
 func TestProperty_TagProjection(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		ps := proptest.ProjectsGen().Draw(t, "projects")
