@@ -68,19 +68,25 @@ func TestListSelection(t *testing.T) {
 func TestEditDescription(t *testing.T) {
 	g, _ := newTestGlobals(t)
 	createTestProject(t, g, "alpha")
-	var cli struct {
-		Edit EditCmd `cmd:""`
+	edit := func(args ...string) string {
+		var cli struct {
+			Edit EditCmd `cmd:""`
+		}
+		parser, err := kong.New(&cli)
+		require.NoError(t, err)
+		_, err = parser.Parse(append([]string{"edit", "alpha"}, args...))
+		require.NoError(t, err)
+		require.NoError(t, cli.Edit.Run(g))
+		require.NoError(t, g.Cat.Load())
+		return g.Cat.List()[0].Description
 	}
-	parser, err := kong.New(&cli)
-	require.NoError(t, err)
-	_, err = parser.Parse([]string{"edit", "alpha", "--desc", "API service"})
-	require.NoError(t, err)
-	require.NoError(t, cli.Edit.Run(g))
-	require.NoError(t, g.Cat.Load())
-	require.Equal(t, "API service", g.Cat.List()[0].Description)
+	require.Equal(t, "API service", edit("--desc", "API service"))
 	selected, err := (Selector{Filters: []string{"desc~api"}}).Select(g.Cat)
 	require.NoError(t, err)
 	require.Len(t, selected, 1)
+	require.Equal(t, "API service", edit("--editor", "nvim"))
+	require.Empty(t, edit("--desc", ""))
+	require.Empty(t, edit("--desc="))
 }
 
 type failingWriter struct{}
