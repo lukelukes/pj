@@ -1,17 +1,16 @@
 package main
 
-import (
-	"fmt"
-	"os"
-	"pj/cmd/cli/render"
-	"slices"
-	"time"
-)
-
 type ListCmd struct {
 	Selector `embed:""`
 	Output   Output `short:"o" enum:"table,names,paths,json" default:"table" help:"Output format: table, names, paths, json"`
 	Names    bool   `short:"n" hidden:"" help:"Alias for --output names"`
+}
+
+func (cmd ListCmd) format() Output {
+	if cmd.Names {
+		return OutputNames
+	}
+	return cmd.Output
 }
 
 func (cmd *ListCmd) Run(g *Globals) error {
@@ -19,36 +18,5 @@ func (cmd *ListCmd) Run(g *Globals) error {
 	if err != nil {
 		return err
 	}
-	output := cmd.Output
-	if cmd.Names {
-		output = OutputNames
-	}
-	if output != "" && output != OutputTable {
-		return printProjects(g.Out, projects, output)
-	}
-
-	items := make([]render.ProjectListItem, len(projects))
-	for i, p := range projects {
-		items[i] = render.ProjectListItem{
-			Name:        p.Name,
-			Path:        p.Path,
-			Description: p.Description,
-			Timestamp:   getMtime(p.Path),
-		}
-	}
-	slices.SortFunc(items, func(a, b render.ProjectListItem) int {
-		return b.Timestamp.Compare(a.Timestamp)
-	})
-
-	view := render.ProjectListView{Items: items}
-	rendered := g.Render.RenderProjectList(view)
-	_, err = fmt.Fprint(g.Out, rendered)
-	return err
-}
-
-func getMtime(path string) time.Time {
-	if info, err := os.Stat(path); err == nil {
-		return info.ModTime()
-	}
-	return time.Time{}
+	return printProjects(g.Out, g.Render, projects, cmd.format())
 }

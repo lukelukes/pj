@@ -90,7 +90,8 @@ var errOutput = errors.New("output failed")
 func (failingWriter) Write([]byte) (int, error) { return 0, errOutput }
 
 func TestProjectionWriteError(t *testing.T) {
-	for _, output := range []Output{OutputNames, OutputPaths, OutputJSON} {
-		require.ErrorIs(t, printProjects(failingWriter{}, []catalog.Project{{Name: "alpha"}}, output), errOutput)
+	g, _ := newTestGlobals(t)
+	for _, output := range []Output{OutputTable, OutputNames, OutputPaths, OutputJSON} {
+		require.ErrorIs(t, printProjects(failingWriter{}, g.Render, []catalog.Project{{Name: "alpha"}}, output), errOutput)
 	}
 }

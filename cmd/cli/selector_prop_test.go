@@ -1,10 +1,8 @@
 package main
 
 import (
-	"cmp"
 	"pj/internal/catalog"
 	"pj/proptest"
-	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -43,9 +41,6 @@ func TestProperty_Selector(t *testing.T) {
 		permuted, err := (Selector{Filters: proptest.Permute(t, raw)}).Select(selectionCatalog{projects: ps})
 		require.NoError(t, err)
 		require.Equal(t, selected, permuted, proptest.InvSelectorOrderIrrelevant)
-		require.True(t, slices.IsSortedFunc(selected, func(a, b catalog.Project) int { return cmp.Compare(a.Name, b.Name) }), "selection must sort by name ascending")
-		want := catalog.Apply(ps, expected)
-		sortProjects(want)
-		require.Equal(t, want, selected)
+		require.Equal(t, catalog.Apply(ps, expected), selected)
 	})
 }

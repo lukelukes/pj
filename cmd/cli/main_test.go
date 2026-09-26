@@ -138,7 +138,7 @@ func TestListCmd_Run(t *testing.T) {
 	t.Run("lists empty catalog", func(t *testing.T) {
 		g, _ := newTestGlobals(t)
 
-		cmd := ListCmd{}
+		cmd := ListCmd{Output: OutputTable}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
@@ -149,7 +149,7 @@ func TestListCmd_Run(t *testing.T) {
 		createTestProject(t, g, "project1")
 		createTestProject(t, g, "project2")
 
-		cmd := ListCmd{}
+		cmd := ListCmd{Output: OutputTable}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
@@ -882,7 +882,7 @@ func TestListCmd_GoldenOutput(t *testing.T) {
 	t.Run("empty list", func(t *testing.T) {
 		g, out, _ := newGoldenTestGlobals(t)
 
-		cmd := ListCmd{}
+		cmd := ListCmd{Output: OutputTable}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
@@ -894,7 +894,7 @@ func TestListCmd_GoldenOutput(t *testing.T) {
 		addProjectWithTime(t, g, pathMap, "pj", "Project tracker and launcher CLI",
 			time.Date(2026, 1, 7, 10, 0, 0, 0, time.Local))
 
-		cmd := ListCmd{}
+		cmd := ListCmd{Output: OutputTable}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
@@ -908,7 +908,7 @@ func TestListCmd_GoldenOutput(t *testing.T) {
 		addProjectWithTime(t, g, pathMap, "booster", "Go build tool with plugin architecture",
 			time.Date(2026, 1, 6, 8, 0, 0, 0, time.Local))
 
-		cmd := ListCmd{}
+		cmd := ListCmd{Output: OutputTable}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
@@ -920,7 +920,7 @@ func TestListCmd_GoldenOutput(t *testing.T) {
 		addProjectWithTime(t, g, pathMap, "dotfiles", "",
 			time.Date(2026, 1, 5, 12, 0, 0, 0, time.Local))
 
-		cmd := ListCmd{}
+		cmd := ListCmd{Output: OutputTable}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
@@ -932,7 +932,7 @@ func TestListCmd_GoldenOutput(t *testing.T) {
 		addProjectWithTime(t, g, pathMap, "old-experiment", "Abandoned spike",
 			time.Date(2024, 10, 1, 0, 0, 0, 0, time.Local))
 
-		cmd := ListCmd{}
+		cmd := ListCmd{Output: OutputTable}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)

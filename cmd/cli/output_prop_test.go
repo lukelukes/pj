@@ -19,12 +19,12 @@ func TestProperty_PlainProjections(t *testing.T) {
 		ps := proptest.ProjectsGen().Draw(t, "projects")
 		original := slices.Clone(ps)
 		sorted := slices.Clone(ps)
-		sortProjects(sorted)
+		slices.SortFunc(sorted, compareByName)
 		require.True(t, slices.IsSortedFunc(sorted, func(a, b catalog.Project) int { return cmp.Compare(a.Name, b.Name) }), "projection must sort by name ascending")
 		for _, output := range []Output{OutputNames, OutputPaths} {
 			var buf, shuffled bytes.Buffer
-			require.NoError(t, printProjects(&buf, ps, output))
-			require.NoError(t, printProjects(&shuffled, proptest.Permute(t, ps), output))
+			require.NoError(t, printProjects(&buf, nil, ps, output))
+			require.NoError(t, printProjects(&shuffled, nil, proptest.Permute(t, ps), output))
 			require.Equal(t, buf.String(), shuffled.String(), proptest.InvProjectionLineCount)
 			require.Equal(t, len(ps), strings.Count(buf.String(), "\n"), proptest.InvProjectionLineCount)
 			lines := strings.Split(strings.TrimSuffix(buf.String(), "\n"), "\n")
@@ -49,14 +49,14 @@ func TestProperty_JSONProjection(t *testing.T) {
 			ps[i].Description = rapid.String().Draw(t, "description")
 		}
 		var buf, shuffled bytes.Buffer
-		require.NoError(t, printProjects(&buf, ps, OutputJSON))
-		require.NoError(t, printProjects(&shuffled, proptest.Permute(t, ps), OutputJSON))
+		require.NoError(t, printProjects(&buf, nil, ps, OutputJSON))
+		require.NoError(t, printProjects(&shuffled, nil, proptest.Permute(t, ps), OutputJSON))
 		require.Equal(t, buf.String(), shuffled.String())
 		var rows []projectJSON
 		require.NoError(t, json.Unmarshal(buf.Bytes(), &rows), proptest.InvJSONRoundTrip)
 		require.NotNil(t, rows, proptest.InvJSONRoundTrip)
 		require.Len(t, rows, len(ps), proptest.InvJSONRoundTrip)
-		sortProjects(ps)
+		slices.SortFunc(ps, compareByName)
 		for i, row := range rows {
 			p := ps[i]
 			require.Equal(t, p.ID, row.ID)
@@ -73,7 +73,7 @@ func TestProperty_JSONProjection(t *testing.T) {
 func TestEmptyJSONProjection(t *testing.T) {
 	for _, ps := range [][]catalog.Project{nil, {}} {
 		var buf bytes.Buffer
-		require.NoError(t, printProjects(&buf, ps, OutputJSON))
+		require.NoError(t, printProjects(&buf, nil, ps, OutputJSON))
 		require.Equal(t, "[]\n", buf.String())
 	}
 }

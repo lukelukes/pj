@@ -1,10 +1,6 @@
 package main
 
-import (
-	"cmp"
-	"pj/internal/catalog"
-	"slices"
-)
+import "pj/internal/catalog"
 
 type Selector struct {
 	Filters []string `name:"filter" short:"f" sep:"none" help:"Match field op value (name, path, editor, desc; =, !=, ~, !~). Repeat to AND."`
@@ -31,13 +27,5 @@ func (s Selector) Select(cat catalog.Catalog) ([]catalog.Project, error) {
 	if err != nil {
 		return nil, err
 	}
-	projects := catalog.Apply(cat.List(), f)
-	sortProjects(projects)
-	return projects, nil
-}
-
-func sortProjects(projects []catalog.Project) {
-	slices.SortFunc(projects, func(a, b catalog.Project) int {
-		return cmp.Or(cmp.Compare(a.Name, b.Name), cmp.Compare(a.Path, b.Path), cmp.Compare(a.ID, b.ID))
-	})
+	return catalog.Apply(cat.List(), f), nil
 }
