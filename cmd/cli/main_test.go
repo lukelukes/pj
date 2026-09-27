@@ -177,7 +177,7 @@ func TestRmCmd_Run(t *testing.T) {
 		g, _ := newTestGlobals(t)
 		createTestProject(t, g, "test-project")
 
-		cmd := RmCmd{Name: "test-project"}
+		cmd := RmCmd{Projects: []string{"test-project"}}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
@@ -188,7 +188,7 @@ func TestRmCmd_Run(t *testing.T) {
 		g, _ := newTestGlobals(t)
 		createTestProject(t, g, "my-test-project")
 
-		cmd := RmCmd{Name: "test"}
+		cmd := RmCmd{Projects: []string{"test"}}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
@@ -198,7 +198,7 @@ func TestRmCmd_Run(t *testing.T) {
 	t.Run("returns error for nonexistent project", func(t *testing.T) {
 		g, _ := newTestGlobals(t)
 
-		cmd := RmCmd{Name: "nonexistent"}
+		cmd := RmCmd{Projects: []string{"nonexistent"}}
 		err := cmd.Run(g)
 
 		assert.Error(t, err)
@@ -210,7 +210,7 @@ func TestRmCmd_Run(t *testing.T) {
 		createTestProject(t, g, "test-project-1")
 		createTestProject(t, g, "test-project-2")
 
-		cmd := RmCmd{Name: "test"}
+		cmd := RmCmd{Projects: []string{"test"}}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
@@ -222,7 +222,7 @@ func TestRmCmd_Run(t *testing.T) {
 		createTestProject(t, g, "exact-match")
 		createTestProject(t, g, "other-project")
 
-		cmd := RmCmd{Name: "exact-match"}
+		cmd := RmCmd{Projects: []string{"exact-match"}}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
@@ -238,7 +238,7 @@ func TestRmCmd_Run(t *testing.T) {
 		createTestProject(t, g, "doomed-project")
 		out.Reset()
 
-		cmd := RmCmd{Name: "doomed-project"}
+		cmd := RmCmd{Projects: []string{"doomed-project"}}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
@@ -405,7 +405,7 @@ func TestIntegration_MultipleOperations(t *testing.T) {
 	p := projects[0]
 	assert.Equal(t, "nvim", p.Editor)
 
-	rmCmd := RmCmd{Name: "node-project"}
+	rmCmd := RmCmd{Projects: []string{"node-project"}}
 	require.NoError(t, rmCmd.Run(g))
 	assert.Equal(t, 1, g.Cat.Count())
 
@@ -840,7 +840,7 @@ func TestAmbiguousMatchOutput(t *testing.T) {
 		createTestProject(t, g, "test-project-2")
 		out.Reset()
 
-		cmd := RmCmd{Name: "test"}
+		cmd := RmCmd{Projects: []string{"test"}}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)

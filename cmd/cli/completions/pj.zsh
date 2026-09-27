@@ -60,7 +60,7 @@ _pj() {
                         '(-o --output)'{-o,--output}'[Output format]:format:(table names paths json)'
                     ;;
                 rm)
-                    _arguments '1:project:_pj_projects'
+                    _arguments '*:project:_pj_projects'
                     ;;
                 o|open)
                     _arguments '1:project:_pj_projects'
