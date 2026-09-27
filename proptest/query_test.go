@@ -208,6 +208,12 @@ func TestGenerators_Coverage(t *testing.T) {
 			buckets["not"] = true
 		}
 		p := projectGen.Example(i)
+		if len(p.Tags) == 0 {
+			buckets["emptyTags"] = true
+		}
+		if len(p.Tags) > 1 {
+			buckets["multipleTags"] = true
+		}
 		if p.Editor == "" {
 			buckets["emptyEditor"] = true
 		}
@@ -215,8 +221,8 @@ func TestGenerators_Coverage(t *testing.T) {
 			buckets["missing"] = true
 		}
 	}
-	expected := []string{"negated", "list", "escaped", "quotedSpace", "glob", "tilde", "bareTerm", "emptyAnd", "not", "emptyEditor", "missing"}
-	for _, qualifier := range []string{"", "name", "desc", "editor", "path", "no", "is"} {
+	expected := []string{"emptyTags", "multipleTags", "negated", "list", "escaped", "quotedSpace", "glob", "tilde", "bareTerm", "emptyAnd", "not", "emptyEditor", "missing"}
+	for _, qualifier := range []string{"", "name", "desc", "editor", "path", "tag", "no", "is"} {
 		expected = append(expected, "qualifier:"+qualifier)
 	}
 	for _, key := range []catalog.SortKey{catalog.SortName, catalog.SortOpened, catalog.SortAdded, catalog.SortModified} {
@@ -251,7 +257,22 @@ func oracleValue(qualifier string, v catalog.Value, p catalog.Project) bool {
 	case "":
 		return oracleMatch(v, p.Name, false, false) || oracleMatch(v, p.Description, false, false)
 	case "no":
+		if v.Text == "tag" {
+			return len(p.Tags) == 0
+		}
 		return projectField(p, v.Text) == ""
+	case "tag":
+		text := strings.ToLower(strings.TrimSpace(v.Text))
+		for _, tag := range p.Tags {
+			if !v.Quoted && strings.ContainsAny(text, "*?[") {
+				if oracleGlob([]rune(text), []rune(tag), false, false) {
+					return true
+				}
+			} else if tag == text {
+				return true
+			}
+		}
+		return false
 	case "is":
 		return testMissing(p)
 	case "path":

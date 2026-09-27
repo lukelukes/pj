@@ -46,6 +46,12 @@ const (
 	InvSentinelNeverMatches    = "INV-57"
 	InvMergeIsAnd              = "INV-58"
 	InvSaveLoadRoundTrip       = "INV-50"
+	InvTagNormalizeIdempotent  = "INV-59"
+	InvTagsSortedUnique        = "INV-60"
+	InvLenientLoadEqualsStrict = "INV-61"
+	InvTagSugarEqualsTerm      = "INV-62"
+	InvAddRemoveTagsInverse    = "INV-63"
+	InvTagSetIsUnion           = "INV-64"
 )
 
 func verifyStructuralInvariants(t *rapid.T, cat catalog.Catalog) {
