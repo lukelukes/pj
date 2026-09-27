@@ -14,9 +14,9 @@ func (cmd ListCmd) format() Output {
 }
 
 func (cmd *ListCmd) Run(g *Globals) error {
-	projects, err := cmd.Select(g.Cat)
+	projects, sort, err := cmd.Select(g.Cat)
 	if err != nil {
 		return err
 	}
-	return printProjects(g.Out, g.Render, projects, cmd.format())
+	return printProjects(g.Out, g.Render, projects, cmd.format(), sort)
 }

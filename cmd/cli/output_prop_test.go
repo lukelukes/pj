@@ -23,8 +23,8 @@ func TestProperty_PlainProjections(t *testing.T) {
 		require.True(t, slices.IsSortedFunc(sorted, func(a, b catalog.Project) int { return cmp.Compare(a.Name, b.Name) }), "projection must sort by name ascending")
 		for _, output := range []Output{OutputNames, OutputPaths} {
 			var buf, shuffled bytes.Buffer
-			require.NoError(t, printProjects(&buf, nil, ps, output))
-			require.NoError(t, printProjects(&shuffled, nil, proptest.Permute(t, ps), output))
+			require.NoError(t, printProjects(&buf, nil, ps, output, nil))
+			require.NoError(t, printProjects(&shuffled, nil, proptest.Permute(t, ps), output, nil))
 			require.Equal(t, buf.String(), shuffled.String(), proptest.InvProjectionLineCount)
 			require.Equal(t, len(ps), strings.Count(buf.String(), "\n"), proptest.InvProjectionLineCount)
 			lines := strings.Split(strings.TrimSuffix(buf.String(), "\n"), "\n")
@@ -49,8 +49,8 @@ func TestProperty_JSONProjection(t *testing.T) {
 			ps[i].Description = rapid.String().Draw(t, "description")
 		}
 		var buf, shuffled bytes.Buffer
-		require.NoError(t, printProjects(&buf, nil, ps, OutputJSON))
-		require.NoError(t, printProjects(&shuffled, nil, proptest.Permute(t, ps), OutputJSON))
+		require.NoError(t, printProjects(&buf, nil, ps, OutputJSON, nil))
+		require.NoError(t, printProjects(&shuffled, nil, proptest.Permute(t, ps), OutputJSON, nil))
 		require.Equal(t, buf.String(), shuffled.String())
 		var rows []projectJSON
 		require.NoError(t, json.Unmarshal(buf.Bytes(), &rows), proptest.InvJSONRoundTrip)
@@ -73,7 +73,7 @@ func TestProperty_JSONProjection(t *testing.T) {
 func TestEmptyJSONProjection(t *testing.T) {
 	for _, ps := range [][]catalog.Project{nil, {}} {
 		var buf bytes.Buffer
-		require.NoError(t, printProjects(&buf, nil, ps, OutputJSON))
+		require.NoError(t, printProjects(&buf, nil, ps, OutputJSON, nil))
 		require.Equal(t, "[]\n", buf.String())
 	}
 }

@@ -3,6 +3,7 @@ package proptest
 import (
 	"fmt"
 	"pj/internal/catalog"
+	"regexp"
 	"slices"
 
 	"pgregory.net/rapid"
@@ -13,7 +14,7 @@ var (
 	iterDirGen     = rapid.StringMatching(`[a-z]{8}`)
 	subdirGen      = rapid.StringMatching(`[a-z]{6}`)
 	shortQueryGen  = rapid.StringMatching(`[a-z]{1,5}`)
-	queryGen       = rapid.StringMatching(`[a-z]{1,10}`)
+	searchQueryGen = rapid.StringMatching(`[a-z]{1,10}`)
 )
 
 func validNameGen() *rapid.Generator[string] {
@@ -114,17 +115,64 @@ projects:
 }
 
 var (
-	fieldNameGen     = rapid.SampledFrom(catalog.FilterFields())
-	opGen            = rapid.SampledFrom(catalog.FilterOps())
+	qualifierPrefix  = regexp.MustCompile(`^[A-Za-z]+:`)
 	optionalFieldGen = rapid.OneOf(rapid.Just(""), rapid.StringMatching(`[a-m]{1,10}`))
-	termValueGen     = rapid.OneOf(
-		rapid.Just(""), rapid.StringMatching(`[a-m0-9]{1,8}`),
-		rapid.SampledFrom([]string{"prefix*", "*suffix", "a?c", "[ab]*", "*"}),
-		rapid.SampledFrom([]string{"a=b", "a~b", "a!b", "a:b", "a=b~!", "a,b"}),
-		rapid.SampledFrom([]string{"AbC", "Éclair", "你好", " leading", "trailing "}),
+	globValueGen     = rapid.SampledFrom([]string{"prefix*", "*suffix", "a?c", "[ab]*", "*", "*a*", "?"})
+	punctValueGen    = rapid.SampledFrom([]string{"a=b", "a~b", "a!b", "a:b", `a\b`, "a-b", "é", "你好", "AbC"})
+	listValueGen     = rapid.OneOf(rapid.StringMatching(`[a-m0-9]{1,6}`), globValueGen, punctValueGen, rapid.Just("-x"))
+	textValueGen     = rapid.OneOf(rapid.StringMatching(`[a-m0-9]{1,6}`), globValueGen, punctValueGen, rapid.Just("a,b")).
+				Filter(func(s string) bool { return !qualifierPrefix.MatchString(s) && s != "NOT" })
+	quotedValueGen = rapid.OneOf(
+		rapid.StringMatching(`[a-m]{1,6}`),
+		rapid.SampledFrom([]string{"web server", `say "hi"`, `back\slash`, "a,b", "why?", "*", "[x", "NOT", "-x", "name:x", "tab\tthere", "Éclair"}),
+		rapid.StringN(1, 8, -1),
 	)
-	termGen = rapid.Custom(func(t *rapid.T) catalog.Term {
-		return catalog.Term{Field: fieldNameGen.Draw(t, "field"), Op: opGen.Draw(t, "op"), Value: termValueGen.Draw(t, "value")}
+	pathValueGen = rapid.OneOf(listValueGen, rapid.SampledFrom([]string{"~", "~/", "~/a*", "/p/*", "/p/?-a", "p/"}))
+	valueGen     = func(bare *rapid.Generator[string]) *rapid.Generator[catalog.Value] {
+		return rapid.Custom(func(t *rapid.T) catalog.Value {
+			if rapid.Bool().Draw(t, "quoted") {
+				return catalog.Value{Text: quotedValueGen.Draw(t, "text"), Quoted: true}
+			}
+			return catalog.Value{Text: bare.Draw(t, "text")}
+		})
+	}
+	fieldQualifierGen = rapid.SampledFrom([]string{"name", "desc", "editor", "path"})
+	termGen           = rapid.Custom(func(t *rapid.T) catalog.Term {
+		term := catalog.Term{Negated: rapid.Bool().Draw(t, "negated")}
+		switch kind := rapid.SampledFrom([]string{"text", "field", "no", "is"}).Draw(t, "kind"); kind {
+		case "text":
+			term.Values = []catalog.Value{valueGen(textValueGen).Draw(t, "value")}
+		case "field":
+			term.Qualifier = fieldQualifierGen.Draw(t, "qualifier")
+			bare := listValueGen
+			if term.Qualifier == "path" {
+				bare = pathValueGen
+			}
+			term.Values = rapid.SliceOfN(valueGen(bare), 1, 3).Draw(t, "values")
+		case "no":
+			term.Qualifier = kind
+			term.Values = rapid.SliceOfN(rapid.Map(rapid.SampledFrom([]string{"desc", "editor"}), func(s string) catalog.Value { return catalog.Value{Text: s} }), 1, 2).Draw(t, "values")
+		case "is":
+			term.Qualifier = kind
+			term.Values = []catalog.Value{{Text: "missing"}}
+		}
+		return term
+	})
+	sortGen = rapid.Custom(func(t *rapid.T) *catalog.Sort {
+		if rapid.Bool().Draw(t, "unsorted") {
+			return nil
+		}
+		return &catalog.Sort{
+			Key:  rapid.SampledFrom([]catalog.SortKey{catalog.SortName, catalog.SortOpened, catalog.SortAdded, catalog.SortModified}).Draw(t, "key"),
+			Desc: rapid.Bool().Draw(t, "desc"),
+		}
+	})
+	queryGen = rapid.Custom(func(t *rapid.T) catalog.Query {
+		q := catalog.Query{Terms: rapid.SliceOfN(termGen, 0, 4).Draw(t, "terms"), Sort: sortGen.Draw(t, "sort")}
+		if len(q.Terms) == 0 && q.Sort == nil {
+			q.Terms = []catalog.Term{termGen.Draw(t, "term")}
+		}
+		return q
 	})
 	projectGen = rapid.Custom(func(t *rapid.T) catalog.Project {
 		name := rapid.StringMatching(`[a-m]{1,10}`).Draw(t, "name")
@@ -143,8 +191,8 @@ var (
 // ProjectsGen generates small in-memory project catalogs with unique paths.
 func ProjectsGen() *rapid.Generator[[]catalog.Project] { return projectsGen }
 
-// TermGen generates valid terms including empty, glob and punctuation values.
-func TermGen() *rapid.Generator[catalog.Term] { return termGen }
+// QueryGen generates parseable queries covering every qualifier, negation, quoting, globs and sorts.
+func QueryGen() *rapid.Generator[catalog.Query] { return queryGen }
 
 // Permute returns a shuffled copy using shrinkable Fisher–Yates draws.
 func Permute[T any](t *rapid.T, xs []T) []T {

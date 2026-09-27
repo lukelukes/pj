@@ -3,8 +3,21 @@ _pj_projects() {
     compadd -S '' -- $projects
 }
 
-_pj_filter_fields() {
-    compadd -S '' -- name= path= editor= desc=
+_pj_query() {
+    compset -P '* '
+    compset -P '-'
+    case $PREFIX in
+        is:*) compset -P '*[:,]'; compadd -S '' -- missing ;;
+        no:*) compset -P '*[:,]'; compadd -S '' -- desc editor ;;
+        sort:*)
+            compset -P 'sort:'
+            compadd -S '' -- name{,-asc,-desc} opened{,-asc,-desc} added{,-asc,-desc} modified{,-asc,-desc}
+            ;;
+        path:*) compset -P 'path:'; _files -/ ;;
+        *:*) ;;
+        \"*) ;;
+        *) compadd -S '' -- name: desc: editor: path: no: is: sort: ;;
+    esac
 }
 
 _pj() {
@@ -43,7 +56,7 @@ _pj() {
                     ;;
                 ls|list)
                     _arguments \
-                        '*'{-f,--filter}'[Filter projects]:filter:_pj_filter_fields' \
+                        '*'{-f,--filter}'[Select projects with a query]:query:_pj_query' \
                         '(-o --output)'{-o,--output}'[Output format]:format:(table names paths json)'
                     ;;
                 rm)
