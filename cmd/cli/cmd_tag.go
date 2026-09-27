@@ -56,7 +56,7 @@ func (cmd *TagDetectCmd) targets(g *Globals) ([]catalog.Project, bool, error) {
 		}
 		projects = resolved
 	}
-	return slices.DeleteFunc(projects, func(p catalog.Project) bool {
+	return slices.DeleteFunc(slices.SortedFunc(slices.Values(projects), compareByName), func(p catalog.Project) bool {
 		info, err := os.Stat(p.Path)
 		return err != nil || !info.IsDir()
 	}), true, nil
