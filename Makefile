@@ -35,11 +35,11 @@ test: ## Run unit tests
 
 .PHONY: test-property
 test-property: ## Run property-based tests (100 iterations)
-	go test -race $(TESTFLAGS) ./proptest -run Property
+	go test -race $(TESTFLAGS) ./proptest ./cmd/cli
 
 .PHONY: test-property-deep
 test-property-deep: ## Run property-based tests (10000 iterations, finds rare bugs)
-	go test -race ./proptest -run Property -rapid.checks=10000
+	go test -race ./proptest ./cmd/cli -run Property -rapid.checks=10000
 
 .PHONY: test-integration
 test-integration: ## Run integration tests

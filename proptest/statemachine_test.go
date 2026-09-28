@@ -59,7 +59,7 @@ func TestProperty_StateMachine_CatalogOperations(t *testing.T) {
 			},
 
 			"search": func(rt *rapid.T) {
-				query := queryGen.Draw(rt, "query")
+				query := searchQueryGen.Draw(rt, "query")
 				_ = checked.Search(query)
 			},
 		})
