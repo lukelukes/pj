@@ -9,11 +9,16 @@ import (
 )
 
 type AddCmd struct {
-	Path string `arg:"" help:"Path to the project directory"`
-	Name string `short:"n" help:"Project name (defaults to directory name)"`
+	Tags []string `name:"tag" short:"t" help:"Add tags (comma-separated or repeated)"`
+	Path string   `arg:"" help:"Path to the project directory"`
+	Name string   `short:"n" help:"Project name (defaults to directory name)"`
 }
 
 func (cmd *AddCmd) Run(g *Globals) error {
+	tags, err := catalog.NormalizeTags(cmd.Tags)
+	if err != nil {
+		return err
+	}
 	cat := g.Cat
 	path, err := config.ExpandPath(cmd.Path)
 	if err != nil {
@@ -33,7 +38,7 @@ func (cmd *AddCmd) Run(g *Globals) error {
 		name = filepath.Base(path)
 	}
 
-	p := catalog.NewProject(name, path)
+	p := catalog.NewProject(name, path).WithTags(tags)
 
 	if err := cat.Add(p); err != nil {
 		return fmt.Errorf("failed to add project %q: %w", name, err)

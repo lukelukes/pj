@@ -117,7 +117,8 @@ func (s Service) initGit(path string) ([]string, error) {
 func (s Service) register(p Plan) error {
 	project := catalog.NewProject(p.Name, p.Path).
 		WithDescription(p.Description).
-		WithEditor(p.Editor)
+		WithEditor(p.Editor).
+		WithTags(p.Tags)
 
 	if err := s.Cat.Add(project); err != nil {
 		return fmt.Errorf("adding project to catalog: %w", err)

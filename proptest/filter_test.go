@@ -2,6 +2,7 @@ package proptest
 
 import (
 	"pj/internal/catalog"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -27,13 +28,13 @@ func TestProperty_ApplyStructure(t *testing.T) {
 		for _, p := range got {
 			counts[p.ID]--
 			require.GreaterOrEqual(t, counts[p.ID], 0, InvFilterSubsetOfList)
-			for cursor < len(ps) && ps[cursor] != p {
+			for cursor < len(ps) && !reflect.DeepEqual(ps[cursor], p) {
 				cursor++
 			}
 			require.Less(t, cursor, len(ps), InvApplyPreservesOrder)
 			cursor++
 		}
-		require.True(t, slices.Equal(original, ps), "Apply mutated input")
+		require.True(t, reflect.DeepEqual(original, ps), "Apply mutated input")
 		require.Equal(t, got, catalog.Apply(got, f), InvApplyIdempotent)
 	})
 }
@@ -45,7 +46,7 @@ func TestProperty_FilterAlgebra(t *testing.T) {
 		left, right := catalog.Apply(ps, f), catalog.Apply(ps, g)
 		intersection, union, complement := []catalog.Project{}, []catalog.Project{}, []catalog.Project{}
 		for _, p := range ps {
-			a, b := slices.Contains(left, p), slices.Contains(right, p)
+			a, b := slices.ContainsFunc(left, func(q catalog.Project) bool { return q.ID == p.ID }), slices.ContainsFunc(right, func(q catalog.Project) bool { return q.ID == p.ID })
 			if a && b {
 				intersection = append(intersection, p)
 			}
@@ -59,7 +60,7 @@ func TestProperty_FilterAlgebra(t *testing.T) {
 		require.Equal(t, intersection, catalog.Apply(ps, catalog.And(f, g)), InvAndIsIntersection)
 		require.Equal(t, union, catalog.Apply(ps, catalog.Or(f, g)), InvOrIsUnion)
 		require.Equal(t, complement, catalog.Apply(ps, catalog.Not(f)), InvNotIsComplement)
-		require.True(t, slices.Equal(ps, catalog.Apply(ps, catalog.And())), InvEmptyAndMatchesAll)
+		require.True(t, reflect.DeepEqual(ps, catalog.Apply(ps, catalog.And())), InvEmptyAndMatchesAll)
 		require.Empty(t, catalog.Apply(ps, catalog.Or()), InvEmptyAndMatchesAll)
 		require.Equal(t, left, catalog.Apply(ps, catalog.And(f)))
 		require.Equal(t, left, catalog.Apply(ps, catalog.Or(f)))

@@ -61,6 +61,24 @@ func findProject(cat catalog.Catalog, query string) (catalog.Project, error) {
 	return catalog.Project{}, &AmbiguousMatchError{Query: query, Matches: matches}
 }
 
+// resolveProjects resolves every query before the caller acts. ok is false when the caller must
+// stop: err is set for a failed lookup, and nil once an ambiguous match has been listed.
+func resolveProjects(g *Globals, queries []string) (projects []catalog.Project, ok bool, err error) {
+	for _, query := range queries {
+		project, err := findProject(g.Cat, query)
+		if err != nil {
+			if handleFindError(g.Out, err) {
+				return nil, false, nil
+			}
+			return nil, false, err
+		}
+		if !slices.ContainsFunc(projects, func(p catalog.Project) bool { return p.ID == project.ID }) {
+			projects = append(projects, project)
+		}
+	}
+	return projects, true, nil
+}
+
 func filterExactName(projects []catalog.Project, name string) []catalog.Project {
 	var exact []catalog.Project
 	for _, p := range projects {

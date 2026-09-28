@@ -3,6 +3,7 @@ package main
 import (
 	"cmp"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -19,9 +20,11 @@ const (
 	OutputNames Output = "names"
 	OutputPaths Output = "paths"
 	OutputJSON  Output = "json"
+	OutputTags  Output = "tags"
 )
 
 type projectJSON struct {
+	Tags         []string  `json:"tags"`
 	ID           string    `json:"id"`
 	Name         string    `json:"name"`
 	Path         string    `json:"path"`
@@ -34,6 +37,9 @@ type projectJSON struct {
 func printProjects(w io.Writer, r render.Renderer, projects []catalog.Project, output Output, sort *catalog.Sort) error {
 	order := defaultSort(output)
 	if sort != nil {
+		if output == OutputTags {
+			return errors.New("sort: does not apply to -o tags, which lists each tag once in name order")
+		}
 		order = *sort
 	}
 	mtime := mtimes()
@@ -45,10 +51,12 @@ func printProjects(w io.Writer, r render.Renderer, projects []catalog.Project, o
 		return printLines(w, projects, func(p catalog.Project) string { return p.Name })
 	case OutputPaths:
 		return printLines(w, projects, func(p catalog.Project) string { return p.Path })
+	case OutputTags:
+		return printLines(w, catalog.TagSet(projects), func(tag string) string { return tag })
 	case OutputJSON:
 		return printJSON(w, projects)
 	default:
-		return fmt.Errorf("unknown output %q (valid outputs: table, names, paths, json)", output)
+		return fmt.Errorf("unknown output %q (valid outputs: table, names, paths, json, tags)", output)
 	}
 }
 
@@ -110,6 +118,7 @@ func printTable(w io.Writer, r render.Renderer, projects []catalog.Project, mtim
 			Path:        p.Path,
 			Description: p.Description,
 			Timestamp:   mtime(p.Path),
+			Tags:        p.Tags,
 		}
 	}
 	_, err := fmt.Fprint(w, r.RenderProjectList(render.ProjectListView{Items: items}))
@@ -123,9 +132,9 @@ func getMtime(path string) time.Time {
 	return time.Time{}
 }
 
-func printLines(w io.Writer, projects []catalog.Project, value func(catalog.Project) string) error {
-	for _, p := range projects {
-		if _, err := fmt.Fprintln(w, value(p)); err != nil {
+func printLines[T any](w io.Writer, items []T, line func(T) string) error {
+	for _, item := range items {
+		if _, err := fmt.Fprintln(w, line(item)); err != nil {
 			return err
 		}
 	}
@@ -135,7 +144,7 @@ func printLines(w io.Writer, projects []catalog.Project, value func(catalog.Proj
 func printJSON(w io.Writer, projects []catalog.Project) error {
 	rows := make([]projectJSON, len(projects))
 	for i, p := range projects {
-		rows[i] = projectJSON{p.ID, p.Name, p.Path, p.Description, p.Editor, p.AddedAt, p.LastAccessed}
+		rows[i] = projectJSON{append([]string{}, p.Tags...), p.ID, p.Name, p.Path, p.Description, p.Editor, p.AddedAt, p.LastAccessed}
 	}
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "  ")

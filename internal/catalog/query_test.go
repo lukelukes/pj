@@ -25,6 +25,7 @@ func TestParseQuery(t *testing.T) {
 		{"name:api", Query{Terms: []Term{{Qualifier: "name", Values: []Value{v("api")}}}}},
 		{"name:a,b", Query{Terms: []Term{{Qualifier: "name", Values: []Value{v("a"), v("b")}}}}},
 		{`desc:"rest api",x`, Query{Terms: []Term{{Qualifier: "desc", Values: []Value{qv("rest api"), v("x")}}}}},
+		{"tag:lang:go", Query{Terms: []Term{{Qualifier: "tag", Values: []Value{v("lang:go")}}}}},
 		{"path:a:b", Query{Terms: []Term{{Qualifier: "path", Values: []Value{v("a:b")}}}}},
 		{"name:-x", Query{Terms: []Term{{Qualifier: "name", Values: []Value{v("-x")}}}}},
 		{"-editor:vim", Query{Terms: []Term{{Negated: true, Qualifier: "editor", Values: []Value{v("vim")}}}}},
@@ -61,7 +62,7 @@ func TestParseQueryErrors(t *testing.T) {
 	}{
 		{"", ErrQuerySyntax, "empty query"},
 		{" \t ", ErrQuerySyntax, "empty query"},
-		{"foo:bar", ErrUnknownQualifier, "desc, editor, is, name, no, path, sort"},
+		{"foo:bar", ErrUnknownQualifier, "desc, editor, is, name, no, path, sort, tag"},
 		{"TAG:go", ErrUnknownQualifier, `"TAG"`},
 		{"http://x", ErrUnknownQualifier, `"http"`},
 		{"name:", ErrQuerySyntax, `empty value for qualifier "name"`},
@@ -86,7 +87,12 @@ func TestParseQueryErrors(t *testing.T) {
 		{"--api", ErrQuerySyntax, "negated once"},
 		{"-NOT api", ErrQuerySyntax, "negated once"},
 		{"is:Missing", ErrBadValue, "valid values: missing"},
-		{"no:name", ErrBadValue, "valid values: desc, editor"},
+		{"no:name", ErrBadValue, "valid values: desc, editor, tag"},
+		{"tag:Go!", ErrInvalidTag, "go!"},
+		{`tag:"go*"`, ErrInvalidTag, "go*"},
+		{"tag:lang:", ErrInvalidTag, "colon"},
+		{"tag:[", ErrBadGlob, "unterminated"},
+		{"tag:**", ErrBadGlob, "**"},
 		{"sort:name sort:opened", ErrBadSort, "only one sort"},
 		{"-sort:name", ErrBadSort, "cannot be negated"},
 		{"NOT sort:name", ErrBadSort, "cannot be negated"},
@@ -112,8 +118,8 @@ func TestParseQueryErrors(t *testing.T) {
 }
 
 func TestQueryMatching(t *testing.T) {
-	api := Project{ID: "1", Name: "api-server", Path: "/h/work/api", Description: "REST API: why?", Editor: "nvim"}
-	web := Project{ID: "2", Name: "Web", Path: "/h/Work/web/ui", Description: "docs/api/service µικρο"}
+	api := Project{ID: "1", Tags: []string{"cli", "lang:go"}, Name: "api-server", Path: "/h/work/api", Description: "REST API: why?", Editor: "nvim"}
+	web := Project{ID: "2", Tags: []string{"team/web"}, Name: "Web", Path: "/h/Work/web/ui", Description: "docs/api/service µικρο"}
 	gone := Project{ID: "3", Name: "école", Path: "/srv/gone", Editor: "code"}
 	all := []Project{api, web, gone}
 	env := QueryEnv{Home: "/h", Missing: func(p Project) bool { return p.ID == "3" }}
@@ -160,6 +166,21 @@ func TestQueryMatching(t *testing.T) {
 		{"NOT is:missing", []string{"1", "2"}},
 		{"api -editor:nvim", []string{"2"}},
 		{"sort:name", []string{"1", "2", "3"}},
+		{"tag:cli", []string{"1"}},
+		{"tag:CLI", []string{"1"}},
+		{`tag:" cli "`, []string{"1"}},
+		{"tag:c", nil},
+		{"tag:lang:go", []string{"1"}},
+		{"tag:lang:*", []string{"1"}},
+		{"tag:*", []string{"1", "2"}},
+		{"tag:*web", []string{"2"}},
+		{"tag:cli,team/web", []string{"1", "2"}},
+		{"tag:cli tag:lang:go", []string{"1"}},
+		{"-tag:cli", []string{"2", "3"}},
+		{"NOT tag:cli,team/web", []string{"3"}},
+		{"no:tag", []string{"3"}},
+		{"-no:tag", []string{"1", "2"}},
+		{"cli", nil},
 	} {
 		t.Run(tc.raw, func(t *testing.T) {
 			q, err := ParseQuery(tc.raw)

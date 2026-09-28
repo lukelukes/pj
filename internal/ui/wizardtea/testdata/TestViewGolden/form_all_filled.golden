@@ -1,7 +1,8 @@
 ✓  name:     api-gateway
 ✓  where:    ~/dev
 ✓  about:    edge router
-✓  editor:   nvim                             inherited
+✓  tags:     lang:go, cli
+✓  editor:   nvim
 →  git:      ● init  ○ skip                   ↵ creates
 │
 └  ~/dev/api-gateway · git init

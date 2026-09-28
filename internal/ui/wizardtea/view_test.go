@@ -27,7 +27,9 @@ func TestViewGolden(t *testing.T) {
 		"form_all_filled": func() *model {
 			m := typeText(t, newTestModel(t, stubPreview{}), "api-gateway")
 			m = send(t, m, "enter", "enter")
-			return send(t, typeText(t, m, "edge router"), "enter", "enter")
+			m = send(t, typeText(t, m, "edge router"), "enter")
+			m = send(t, typeText(t, m, "lang:go, cli"), "enter")
+			return send(t, typeText(t, m, "nvim"), "enter")
 		},
 		"confirm_adopt": func() *model {
 			return commit(t, typeText(t, newTestModel(t, adoptStub), "legacy"))
