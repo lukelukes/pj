@@ -58,3 +58,18 @@ func assertNoDuplicatePaths(t *rapid.T, projects []catalog.Project) {
 		paths[p.Path] = true
 	}
 }
+
+const testHome = "/p"
+
+func testMissing(p catalog.Project) bool { return len(p.Name)%2 == 0 }
+
+var testEnv = catalog.QueryEnv{Home: testHome, Missing: testMissing}
+
+func mustCompile(t *rapid.T, term catalog.Term) catalog.Filter {
+	t.Helper()
+	f, err := term.Compile(testEnv)
+	if err != nil {
+		t.Fatalf("compile %q: %v", term, err)
+	}
+	return f
+}

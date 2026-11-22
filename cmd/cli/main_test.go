@@ -138,7 +138,7 @@ func TestListCmd_Run(t *testing.T) {
 	t.Run("lists empty catalog", func(t *testing.T) {
 		g, _ := newTestGlobals(t)
 
-		cmd := ListCmd{}
+		cmd := ListCmd{Output: OutputTable}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
@@ -149,7 +149,7 @@ func TestListCmd_Run(t *testing.T) {
 		createTestProject(t, g, "project1")
 		createTestProject(t, g, "project2")
 
-		cmd := ListCmd{}
+		cmd := ListCmd{Output: OutputTable}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
@@ -177,7 +177,7 @@ func TestRmCmd_Run(t *testing.T) {
 		g, _ := newTestGlobals(t)
 		createTestProject(t, g, "test-project")
 
-		cmd := RmCmd{Name: "test-project"}
+		cmd := RmCmd{Projects: []string{"test-project"}}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
@@ -188,7 +188,7 @@ func TestRmCmd_Run(t *testing.T) {
 		g, _ := newTestGlobals(t)
 		createTestProject(t, g, "my-test-project")
 
-		cmd := RmCmd{Name: "test"}
+		cmd := RmCmd{Projects: []string{"test"}}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
@@ -198,7 +198,7 @@ func TestRmCmd_Run(t *testing.T) {
 	t.Run("returns error for nonexistent project", func(t *testing.T) {
 		g, _ := newTestGlobals(t)
 
-		cmd := RmCmd{Name: "nonexistent"}
+		cmd := RmCmd{Projects: []string{"nonexistent"}}
 		err := cmd.Run(g)
 
 		assert.Error(t, err)
@@ -210,7 +210,7 @@ func TestRmCmd_Run(t *testing.T) {
 		createTestProject(t, g, "test-project-1")
 		createTestProject(t, g, "test-project-2")
 
-		cmd := RmCmd{Name: "test"}
+		cmd := RmCmd{Projects: []string{"test"}}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
@@ -222,7 +222,7 @@ func TestRmCmd_Run(t *testing.T) {
 		createTestProject(t, g, "exact-match")
 		createTestProject(t, g, "other-project")
 
-		cmd := RmCmd{Name: "exact-match"}
+		cmd := RmCmd{Projects: []string{"exact-match"}}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
@@ -238,7 +238,7 @@ func TestRmCmd_Run(t *testing.T) {
 		createTestProject(t, g, "doomed-project")
 		out.Reset()
 
-		cmd := RmCmd{Name: "doomed-project"}
+		cmd := RmCmd{Projects: []string{"doomed-project"}}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
@@ -405,7 +405,7 @@ func TestIntegration_MultipleOperations(t *testing.T) {
 	p := projects[0]
 	assert.Equal(t, "nvim", p.Editor)
 
-	rmCmd := RmCmd{Name: "node-project"}
+	rmCmd := RmCmd{Projects: []string{"node-project"}}
 	require.NoError(t, rmCmd.Run(g))
 	assert.Equal(t, 1, g.Cat.Count())
 
@@ -840,7 +840,7 @@ func TestAmbiguousMatchOutput(t *testing.T) {
 		createTestProject(t, g, "test-project-2")
 		out.Reset()
 
-		cmd := RmCmd{Name: "test"}
+		cmd := RmCmd{Projects: []string{"test"}}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
@@ -882,7 +882,7 @@ func TestListCmd_GoldenOutput(t *testing.T) {
 	t.Run("empty list", func(t *testing.T) {
 		g, out, _ := newGoldenTestGlobals(t)
 
-		cmd := ListCmd{}
+		cmd := ListCmd{Output: OutputTable}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
@@ -894,7 +894,7 @@ func TestListCmd_GoldenOutput(t *testing.T) {
 		addProjectWithTime(t, g, pathMap, "pj", "Project tracker and launcher CLI",
 			time.Date(2026, 1, 7, 10, 0, 0, 0, time.Local))
 
-		cmd := ListCmd{}
+		cmd := ListCmd{Output: OutputTable}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
@@ -908,7 +908,7 @@ func TestListCmd_GoldenOutput(t *testing.T) {
 		addProjectWithTime(t, g, pathMap, "booster", "Go build tool with plugin architecture",
 			time.Date(2026, 1, 6, 8, 0, 0, 0, time.Local))
 
-		cmd := ListCmd{}
+		cmd := ListCmd{Output: OutputTable}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
@@ -920,7 +920,7 @@ func TestListCmd_GoldenOutput(t *testing.T) {
 		addProjectWithTime(t, g, pathMap, "dotfiles", "",
 			time.Date(2026, 1, 5, 12, 0, 0, 0, time.Local))
 
-		cmd := ListCmd{}
+		cmd := ListCmd{Output: OutputTable}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)
@@ -932,7 +932,7 @@ func TestListCmd_GoldenOutput(t *testing.T) {
 		addProjectWithTime(t, g, pathMap, "old-experiment", "Abandoned spike",
 			time.Date(2024, 10, 1, 0, 0, 0, 0, time.Local))
 
-		cmd := ListCmd{}
+		cmd := ListCmd{Output: OutputTable}
 		err := cmd.Run(g)
 
 		require.NoError(t, err)

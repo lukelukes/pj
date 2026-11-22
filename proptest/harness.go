@@ -21,13 +21,37 @@ const (
 type ProjectGenOpt func(*projectGenConfig)
 
 type projectGenConfig struct {
-	name *string
+	name        *string
+	editor      *string
+	description *string
 }
 
 func WithName(name string) ProjectGenOpt {
 	return func(c *projectGenConfig) {
 		c.name = &name
 	}
+}
+
+func WithEditor(editor string) ProjectGenOpt {
+	return func(c *projectGenConfig) { c.editor = &editor }
+}
+
+func WithDescription(description string) ProjectGenOpt {
+	return func(c *projectGenConfig) { c.description = &description }
+}
+
+func projectMetadata(t *rapid.T, cfg *projectGenConfig, p catalog.Project) catalog.Project {
+	if cfg.editor != nil {
+		p.Editor = *cfg.editor
+	} else {
+		p.Editor = optionalFieldGen.Draw(t, "editor")
+	}
+	if cfg.description != nil {
+		p.Description = *cfg.description
+	} else {
+		p.Description = optionalFieldGen.Draw(t, "description")
+	}
+	return p
 }
 
 func GenProject(t *rapid.T, dir string, opts ...ProjectGenOpt) catalog.Project {
@@ -51,7 +75,7 @@ func GenProject(t *rapid.T, dir string, opts ...ProjectGenOpt) catalog.Project {
 
 	p := catalog.NewProject(name, path)
 
-	return p
+	return projectMetadata(t, cfg, p)
 }
 
 type Harness struct {
