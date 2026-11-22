@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 type ShowCmd struct {
 	Name string `arg:"" help:"Project name" completion:"pj list -n"`
@@ -25,6 +28,9 @@ func (cmd *ShowCmd) Run(g *Globals) error {
 	fmt.Fprintf(g.Out, "Path:   %s\n", project.Path)
 	if project.Editor != "" {
 		fmt.Fprintf(g.Out, "Editor: %s\n", project.Editor)
+	}
+	if len(project.Tags) > 0 {
+		fmt.Fprintf(g.Out, "Tags:   %s\n", strings.Join(project.Tags, ", "))
 	}
 	return nil
 }

@@ -2,7 +2,7 @@ package main
 
 type ListCmd struct {
 	Selector `embed:""`
-	Output   Output `short:"o" enum:"table,names,paths,json" default:"table" help:"Output format: table, names, paths, json"`
+	Output   Output `short:"o" enum:"table,names,paths,json,tags" default:"table" help:"Output format: table, names, paths, json, tags"`
 	Names    bool   `short:"n" hidden:"" help:"Alias for --output names"`
 }
 

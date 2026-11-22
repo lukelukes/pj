@@ -13,6 +13,7 @@ const (
 	fieldName field = iota
 	fieldLocation
 	fieldDescription
+	fieldTags
 	fieldEditor
 	fieldGit
 	fieldCount
@@ -25,7 +26,7 @@ const (
 	modeConfirm
 )
 
-const textFields = 4
+const textFields = 5
 
 type model struct {
 	session ui.Session
@@ -50,9 +51,10 @@ func newModel(s ui.Session, pal ui.Palette) *model {
 		s.Draft.Name,
 		s.Draft.Location,
 		s.Draft.Description,
+		s.Draft.Tags,
 		s.Draft.Editor,
 	}
-	placeholders := [textFields]string{"", "", "what is it for", s.EditorHint}
+	placeholders := [textFields]string{"", "", "what is it for", "lang:go, cli", s.EditorHint}
 
 	for i := range m.inputs {
 		in := textinput.New()
@@ -72,6 +74,7 @@ func (m *model) draft() ui.Draft {
 		Name:        m.inputs[fieldName].Value(),
 		Location:    m.inputs[fieldLocation].Value(),
 		Description: m.inputs[fieldDescription].Value(),
+		Tags:        m.inputs[fieldTags].Value(),
 		Editor:      m.inputs[fieldEditor].Value(),
 		Git:         m.git,
 	}

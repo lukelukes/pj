@@ -51,7 +51,11 @@ func projectMetadata(t *rapid.T, cfg *projectGenConfig, p catalog.Project) catal
 	} else {
 		p.Description = optionalFieldGen.Draw(t, "description")
 	}
-	return p
+	tags, err := catalog.NormalizeTags(tagsGen.Draw(t, "tags"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p.WithTags(tags)
 }
 
 func GenProject(t *rapid.T, dir string, opts ...ProjectGenOpt) catalog.Project {

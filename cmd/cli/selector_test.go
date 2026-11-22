@@ -183,7 +183,40 @@ func (failingWriter) Write([]byte) (int, error) { return 0, errOutput }
 
 func TestProjectionWriteError(t *testing.T) {
 	g, _ := newTestGlobals(t)
-	for _, output := range []Output{OutputTable, OutputNames, OutputPaths, OutputJSON} {
-		require.ErrorIs(t, printProjects(failingWriter{}, g.Render, []catalog.Project{{Name: "alpha"}}, output, nil), errOutput)
+	for _, output := range []Output{OutputTable, OutputNames, OutputPaths, OutputJSON, OutputTags} {
+		require.ErrorIs(t, printProjects(failingWriter{}, g.Render, []catalog.Project{{Name: "alpha", Tags: []string{"cli"}}}, output, nil), errOutput)
 	}
+	require.ErrorContains(t, printProjects(failingWriter{}, g.Render, nil, OutputTags, &catalog.Sort{Key: catalog.SortName}), "sort: does not apply")
+}
+
+func TestListTags(t *testing.T) {
+	g, out := newTestGlobals(t)
+	for name, tags := range map[string][]string{"api": {"cli", "lang:go"}, "web": {"lang:ts", "team/web"}, "notes": nil} {
+		p, err := g.Cat.GetByPath(createTestProject(t, g, name))
+		require.NoError(t, err)
+		require.NoError(t, g.Cat.Update(p.WithTags(tags)))
+	}
+	for _, tc := range []struct {
+		filter string
+		output Output
+		want   string
+	}{
+		{"tag:lang:*", OutputNames, "api\nweb\n"},
+		{"tag:Go,lang:ts", OutputNames, "web\n"},
+		{"tag:lang:go,lang:ts", OutputNames, "api\nweb\n"},
+		{"tag:cli tag:lang:go", OutputNames, "api\n"},
+		{"-tag:cli", OutputNames, "notes\nweb\n"},
+		{"no:tag", OutputNames, "notes\n"},
+		{"tag:*", OutputTags, "cli\nlang:go\nlang:ts\nteam/web\n"},
+		{"tag:lang:go", OutputTags, "cli\nlang:go\n"},
+	} {
+		out.Reset()
+		cmd := ListCmd{Selector: Selector{Filters: []string{tc.filter}}, Output: tc.output}
+		require.NoError(t, cmd.Run(g), tc.filter)
+		require.Equal(t, tc.want, out.String(), tc.filter)
+	}
+	cmd := ListCmd{Selector: Selector{Filters: []string{"sort:name"}}, Output: OutputTags}
+	require.ErrorContains(t, cmd.Run(g), "sort: does not apply")
+	cmd = ListCmd{Selector: Selector{Filters: []string{"tag:go!"}}, Output: OutputNames}
+	require.ErrorIs(t, cmd.Run(g), catalog.ErrInvalidTag)
 }

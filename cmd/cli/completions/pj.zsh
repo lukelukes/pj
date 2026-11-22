@@ -3,12 +3,18 @@ _pj_projects() {
     compadd -S '' -- $projects
 }
 
+_pj_tags() {
+    local tags=(${(f)"$(pj list -o tags 2>/dev/null)"})
+    compadd -S '' -- $tags
+}
+
 _pj_query() {
     compset -P '* '
     compset -P '-'
     case $PREFIX in
+        tag:*) compset -P 'tag:'; compset -P '*,'; _pj_tags ;;
         is:*) compset -P '*[:,]'; compadd -S '' -- missing ;;
-        no:*) compset -P '*[:,]'; compadd -S '' -- desc editor ;;
+        no:*) compset -P '*[:,]'; compadd -S '' -- desc editor tag ;;
         sort:*)
             compset -P 'sort:'
             compadd -S '' -- name{,-asc,-desc} opened{,-asc,-desc} added{,-asc,-desc} modified{,-asc,-desc}
@@ -16,7 +22,7 @@ _pj_query() {
         path:*) compset -P 'path:'; _files -/ ;;
         *:*) ;;
         \"*) ;;
-        *) compadd -S '' -- name: desc: editor: path: no: is: sort: ;;
+        *) compadd -S '' -- name: desc: editor: path: tag: no: is: sort: ;;
     esac
 }
 
@@ -35,6 +41,7 @@ _pj() {
         'new:Create a new project'
         'show:Show project details'
         'cd:Change directory to project'
+        'tag:Manage project tags'
         'init:Generate shell integration'
         'completion:Generate shell completions'
     )
@@ -51,13 +58,14 @@ _pj() {
             case $line[1] in
                 a|add)
                     _arguments \
+                        '*'{-t,--tag}'[Tags]:tag:_pj_tags' \
                         '(-n --name)'{-n,--name}'[Project name]:name:' \
                         '1:path:_files -/'
                     ;;
                 ls|list)
                     _arguments \
                         '*'{-f,--filter}'[Select projects with a query]:query:_pj_query' \
-                        '(-o --output)'{-o,--output}'[Output format]:format:(table names paths json)'
+                        '(-o --output)'{-o,--output}'[Output format]:format:(table names paths json tags)'
                     ;;
                 rm)
                     _arguments '*:project:_pj_projects'
@@ -67,12 +75,16 @@ _pj() {
                     ;;
                 e|edit)
                     _arguments \
+                        '*'{-t,--tag}'[Tags]:tag:_pj_tags' \
+                        '(--clear-tags)*--untag[Remove tags]:tag:_pj_tags' \
+                        '(--untag)--clear-tags[Remove all tags]' \
                         '--desc[Set description]:description:' \
                         '--editor[Set editor]:editor:' \
                         '1:project:_pj_projects'
                     ;;
                 create|new)
                     _arguments \
+                        '*'{-t,--tag}'[Tags]:tag:_pj_tags' \
                         '--at[Parent directory]:directory:_files -/' \
                         '--desc[Project description]:description:' \
                         '--editor[Editor command]:editor:' \
@@ -88,6 +100,17 @@ _pj() {
                     ;;
                 cd)
                     _arguments '1:project:_pj_projects'
+                    ;;
+                tag)
+                    if (( CURRENT == 2 )); then
+                        local -a tag_commands=('detect:Detect language tags from project files')
+                        _describe 'tag command' tag_commands
+                    else
+                        _arguments \
+                            '--all[Scan every project in the catalog]' \
+                            '--apply[Save detected tags]' \
+                            '*:project:_pj_projects'
+                    fi
                     ;;
                 completion)
                     _arguments '1:shell:(zsh)'

@@ -5,6 +5,7 @@ import (
 	"pj/internal/catalog"
 	"regexp"
 	"slices"
+	"strings"
 
 	"pgregory.net/rapid"
 )
@@ -116,6 +117,8 @@ projects:
 
 var (
 	qualifierPrefix  = regexp.MustCompile(`^[A-Za-z]+:`)
+	tagGen           = rapid.StringMatching(`[a-m0-9]([a-m0-9_.:/+-]{0,8}[a-m0-9_./+-])?`)
+	tagsGen          = rapid.SliceOfN(tagGen, 0, 5)
 	optionalFieldGen = rapid.OneOf(rapid.Just(""), rapid.StringMatching(`[a-m]{1,10}`))
 	globValueGen     = rapid.SampledFrom([]string{"prefix*", "*suffix", "a?c", "[ab]*", "*", "*a*", "?"})
 	punctValueGen    = rapid.SampledFrom([]string{"a=b", "a~b", "a!b", "a:b", `a\b`, "a-b", "é", "你好", "AbC"})
@@ -137,9 +140,21 @@ var (
 		})
 	}
 	fieldQualifierGen = rapid.SampledFrom([]string{"name", "desc", "editor", "path"})
-	termGen           = rapid.Custom(func(t *rapid.T) catalog.Term {
+	tagValueGen       = rapid.Custom(func(t *rapid.T) catalog.Value {
+		switch rapid.IntRange(0, 3).Draw(t, "form") {
+		case 0:
+			return catalog.Value{Text: tagGen.Draw(t, "tag"), Quoted: true}
+		case 1:
+			return catalog.Value{Text: strings.ToUpper(tagGen.Draw(t, "tag"))}
+		case 2:
+			return catalog.Value{Text: rapid.SampledFrom([]string{"*", "a*", "*/*", "?", "[ab]*", "*:*", "*a*"}).Draw(t, "glob")}
+		default:
+			return catalog.Value{Text: tagGen.Draw(t, "tag")}
+		}
+	})
+	termGen = rapid.Custom(func(t *rapid.T) catalog.Term {
 		term := catalog.Term{Negated: rapid.Bool().Draw(t, "negated")}
-		switch kind := rapid.SampledFrom([]string{"text", "field", "no", "is"}).Draw(t, "kind"); kind {
+		switch kind := rapid.SampledFrom([]string{"text", "field", "tag", "no", "is"}).Draw(t, "kind"); kind {
 		case "text":
 			term.Values = []catalog.Value{valueGen(textValueGen).Draw(t, "value")}
 		case "field":
@@ -149,9 +164,12 @@ var (
 				bare = pathValueGen
 			}
 			term.Values = rapid.SliceOfN(valueGen(bare), 1, 3).Draw(t, "values")
+		case "tag":
+			term.Qualifier = kind
+			term.Values = rapid.SliceOfN(tagValueGen, 1, 3).Draw(t, "values")
 		case "no":
 			term.Qualifier = kind
-			term.Values = rapid.SliceOfN(rapid.Map(rapid.SampledFrom([]string{"desc", "editor"}), func(s string) catalog.Value { return catalog.Value{Text: s} }), 1, 2).Draw(t, "values")
+			term.Values = rapid.SliceOfN(rapid.Map(rapid.SampledFrom([]string{"desc", "editor", "tag"}), func(s string) catalog.Value { return catalog.Value{Text: s} }), 1, 2).Draw(t, "values")
 		case "is":
 			term.Qualifier = kind
 			term.Values = []catalog.Value{{Text: "missing"}}

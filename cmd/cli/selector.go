@@ -6,7 +6,7 @@ import (
 )
 
 type Selector struct {
-	Filters []string `name:"filter" short:"f" sep:"none" placeholder:"QUERY" help:"Select projects with a query, e.g. 'api path:~/work/* NOT is:missing sort:opened'. Qualifiers: name, desc, editor, path, no, is, sort. Repeat to AND. Start with NOT, or use --filter=-x, to negate a lone term."`
+	Filters []string `name:"filter" short:"f" sep:"none" placeholder:"QUERY" help:"Select projects with a query, e.g. 'api path:~/work/* NOT is:missing sort:opened'. Qualifiers: name, desc, editor, path, tag, no, is, sort. Repeat to AND. Start with NOT, or use --filter=-x, to negate a lone term."`
 }
 
 func (s Selector) Query() (catalog.Query, error) {

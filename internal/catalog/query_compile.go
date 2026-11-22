@@ -22,33 +22,43 @@ type matchMode struct {
 	caseSensitive bool
 	slashAware    bool
 	tilde         bool
+	tag           bool
 }
 
 type qualifier struct {
-	fields []func(Project) string
+	fields func(Project) []string
 	mode   matchMode
 	values map[string]func(QueryEnv) (Filter, error)
 }
 
+func field(get func(Project) string) func(Project) []string {
+	return func(p Project) []string { return []string{get(p)} }
+}
+
 var (
-	nameField   = func(p Project) string { return p.Name }
-	descField   = func(p Project) string { return p.Description }
-	editorField = func(p Project) string { return p.Editor }
-	pathField   = func(p Project) string { return p.Path }
+	nameField   = field(func(p Project) string { return p.Name })
+	descField   = field(func(p Project) string { return p.Description })
+	editorField = field(func(p Project) string { return p.Editor })
+	pathField   = field(func(p Project) string { return p.Path })
+	tagsField   = func(p Project) []string { return p.Tags }
 )
 
-func empty(field func(Project) string) func(QueryEnv) (Filter, error) {
-	return func(QueryEnv) (Filter, error) { return func(p Project) bool { return field(p) == "" }, nil }
+func empty(get func(Project) []string) func(QueryEnv) (Filter, error) {
+	return func(QueryEnv) (Filter, error) {
+		return func(p Project) bool { return !slices.ContainsFunc(get(p), func(s string) bool { return s != "" }) }, nil
+	}
 }
 
 var qualifiers = map[string]qualifier{
-	"name":   {fields: []func(Project) string{nameField}},
-	"desc":   {fields: []func(Project) string{descField}},
-	"editor": {fields: []func(Project) string{editorField}},
-	"path":   {fields: []func(Project) string{pathField}, mode: matchMode{caseSensitive: true, slashAware: true, tilde: true}},
+	"name":   {fields: nameField},
+	"desc":   {fields: descField},
+	"editor": {fields: editorField},
+	"path":   {fields: pathField, mode: matchMode{caseSensitive: true, slashAware: true, tilde: true}},
+	"tag":    {fields: tagsField, mode: matchMode{tag: true}},
 	"no": {values: map[string]func(QueryEnv) (Filter, error){
 		"desc":   empty(descField),
 		"editor": empty(editorField),
+		"tag":    empty(tagsField),
 	}},
 	"is": {values: map[string]func(QueryEnv) (Filter, error){
 		"missing": func(env QueryEnv) (Filter, error) {
@@ -60,7 +70,7 @@ var qualifiers = map[string]qualifier{
 	}},
 }
 
-var textTerm = qualifier{fields: []func(Project) string{nameField, descField}}
+var textTerm = qualifier{fields: func(p Project) []string { return []string{p.Name, p.Description} }}
 
 // Compile returns the filter matching projects that satisfy every term.
 func (q Query) Compile(env QueryEnv) (Filter, error) {
@@ -115,17 +125,29 @@ func (q qualifier) compileValue(name string, v Value, env QueryEnv) (Filter, err
 	if err != nil {
 		return nil, err
 	}
-	return func(p Project) bool {
-		for _, field := range q.fields {
-			if match(field(p)) {
-				return true
-			}
+	return func(p Project) bool { return slices.ContainsFunc(q.fields(p), match) }, nil
+}
+
+func tagMatcher(v Value) (func(string) bool, error) {
+	text := strings.ToLower(strings.TrimSpace(v.Text))
+	if !v.Quoted && strings.ContainsAny(text, "*?[") {
+		re, err := globRegexp("", text, matchMode{})
+		if err != nil {
+			return nil, err
 		}
-		return false
-	}, nil
+		return re.MatchString, nil
+	}
+	tag, err := NormalizeTag(text)
+	if err != nil {
+		return nil, err
+	}
+	return func(s string) bool { return s == tag }, nil
 }
 
 func matcher(v Value, mode matchMode, home string) (func(string) bool, error) {
+	if mode.tag {
+		return tagMatcher(v)
+	}
 	text, prefix := v.Text, ""
 	if mode.tilde && (text == "~" || strings.HasPrefix(text, "~/")) {
 		if home == "" {
