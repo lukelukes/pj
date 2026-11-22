@@ -118,8 +118,6 @@ linters:
       - linters:
           - dupl
           - errcheck
-          - gocyclo
-          - gosec
           - staticcheck
           - unparam
         path: _test\.go
@@ -147,8 +145,6 @@ output:
       path: stdout
       print-issued-lines: true
       print-linter-name: true
-    junit-xml:
-      path: './out/lint.xml'
   show-stats: true
 
 issues:

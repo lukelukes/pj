@@ -20,7 +20,7 @@ jobs:
   release:
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 #v6.0.1
@@ -35,10 +35,11 @@ jobs:
             exit 1
           fi
 
-      # CI already runs Verify and Lint on every master push, so the release
-      # only checks that this exact commit has a green CI run instead of
-      # repeating the work. Waits up to 10 minutes if CI is still running.
+      # CI already runs on every master push, so the release only checks that
+      # this exact commit has a green CI run instead of repeating the work.
+      # Waits up to 10 minutes if CI is still running.
       - name: Require a passing CI run for this commit
+        if: ${{ !inputs.dry_run }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -62,14 +63,16 @@ jobs:
           exit 1
 
       - name: Set up Go
+        if: ${{ !inputs.dry_run }}
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e #v7.0.0
         with:
           go-version-file: go.mod
           cache: false
 
       # Own key so the cache holds goreleaser's cross-compiled builds;
-      # falls back to the CI verify cache when no release cache exists yet.
+      # falls back to the CI cache when no release cache exists yet.
       - name: Cache Go modules and build cache
+        if: ${{ !inputs.dry_run }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 #v6.1.0
         with:
           path: |
@@ -78,7 +81,7 @@ jobs:
           key: go-release-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}
           restore-keys: |
             go-release-${{ runner.os }}-
-            go-verify-${{ runner.os }}-
+            go-ci-${{ runner.os }}-
 
       # Runs the semantic-release CLI directly instead of via
       # go-semantic-release/action, which is unmaintained (still on Node 20)
@@ -99,14 +102,17 @@ jobs:
 
           args=(
             --version-file
-            --changelog .generated-go-semantic-release-changelog.md
             --allow-initial-development-versions
-            --hooks goreleaser
           )
-          version_file=.version
           if [ "$DRY_RUN" = "true" ]; then
             args+=(--dry)
             version_file=.version-unreleased
+          else
+            args+=(
+              --changelog .generated-go-semantic-release-changelog.md
+              --hooks goreleaser
+            )
+            version_file=.version
           fi
 
           rc=0

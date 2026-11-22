@@ -18,13 +18,14 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  GOLANGCI_LINT_VERSION: v2.13.2
   GOVULNCHECK_VERSION: v1.8.0
 
 jobs:
-  verify:
-    name: Verify
+  ci:
+    name: CI
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 #v6.0.1
@@ -35,21 +36,19 @@ jobs:
           go-version-file: go.mod
           cache: false
 
-      # setup-go's built-in cache keys only on go.sum, so every job in the repo
-      # shares one entry and whichever finishes first (Lint) wins - leaving the
-      # build cache empty for the jobs that compile. Key this cache per job.
-      - name: Restore Go modules, build cache and tools
+      - name: Restore Go and linter caches
+        id: cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 #v6.1.0
         with:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
             ~/go/bin
-          key: go-verify-${{ runner.os }}-govulncheck-${{ env.GOVULNCHECK_VERSION }}-${{ hashFiles('go.mod', 'go.sum') }}-${{ github.run_id }}
+            ~/.cache/golangci-lint
+          key: go-ci-${{ runner.os }}-${{ env.GOLANGCI_LINT_VERSION }}-${{ env.GOVULNCHECK_VERSION }}-${{ hashFiles('go.mod', 'go.sum') }}
           restore-keys: |
-            go-verify-${{ runner.os }}-govulncheck-${{ env.GOVULNCHECK_VERSION }}-${{ hashFiles('go.mod', 'go.sum') }}-
-            go-verify-${{ runner.os }}-govulncheck-${{ env.GOVULNCHECK_VERSION }}-
-            go-verify-${{ runner.os }}-
+            go-ci-${{ runner.os }}-${{ env.GOLANGCI_LINT_VERSION }}-${{ env.GOVULNCHECK_VERSION }}-
+            go-ci-${{ runner.os }}-
 
       - name: Install govulncheck
         run: |
@@ -63,31 +62,22 @@ jobs:
       - name: Verify
         run: make verify-ci
 
-      - name: Save Go modules, build cache and tools
-        if: ${{ !cancelled() && github.ref == 'refs/heads/master' }}
+      # Run even if Verify fails so lint diagnostics surface in the same run.
+      # Caching is handled by the unified restore/save steps above.
+      - name: Lint
+        if: ${{ !cancelled() }}
+        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 #v9.2.0
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          skip-cache: true
+
+      - name: Save Go and linter caches
+        if: ${{ github.ref == 'refs/heads/master' && steps.cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 #v6.1.0
         with:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
             ~/go/bin
-          key: go-verify-${{ runner.os }}-govulncheck-${{ env.GOVULNCHECK_VERSION }}-${{ hashFiles('go.mod', 'go.sum') }}-${{ github.run_id }}
-
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 #v6.0.1
-
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e #v7.0.0
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Lint
-        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 #v9.2.0
-        with:
-          version: v2.13.2
+            ~/.cache/golangci-lint
+          key: go-ci-${{ runner.os }}-${{ env.GOLANGCI_LINT_VERSION }}-${{ env.GOVULNCHECK_VERSION }}-${{ hashFiles('go.mod', 'go.sum') }}

@@ -10,9 +10,9 @@ PKG := ./cmd/cli
 COVER_OUT := $(BUILD_DIR)/coverage.out
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
-COMMIT  := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
-DATE    := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
-LDFLAGS := -ldflags "-s -w -X main.Version=$(VERSION) -X main.Commit=$(COMMIT) -X main.Date=$(DATE)"
+COMMIT   = $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+DATE     = $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+LDFLAGS  = -ldflags "-s -w -X main.Version=$(VERSION) -X main.Commit=$(COMMIT) -X main.Date=$(DATE)"
 TESTFLAGS ?=
 
 .PHONY: all
@@ -41,15 +41,9 @@ test-property: ## Run property-based tests (100 iterations)
 test-property-deep: ## Run property-based tests (10000 iterations, finds rare bugs)
 	go test -race ./proptest -run Property -rapid.checks=10000
 
-.PHONY: test-integration
-test-integration: ## Run integration tests
-	#go test -race ./tests/integration/...
-	echo "No integration tests yet"
-
 .PHONY: test-all
 test-all: ## Run all tests
 	go test -race $(TESTFLAGS) ./internal/... ./cmd/... ./proptest
-	@$(MAKE) test-integration
 
 .PHONY: bench
 bench: ## Run benchmarks
@@ -150,13 +144,12 @@ mod-verify: ## Verify dependencies haven't been tampered with
 
 .PHONY: verify-dev
 verify-dev: ## Run all quality checks - in local dev
-	@$(MAKE) -j4 build lint fmt-check vet vuln tidy mod-verify
-	@$(MAKE) test-all
+	@$(MAKE) tidy
+	@$(MAKE) -j4 build lint vuln mod-verify test-all
 
 .PHONY: verify-ci
 verify-ci: ## Run all quality checks - in CI
-	@$(MAKE) -j4 build vet vuln tidy-check mod-verify
-	@$(MAKE) test-all TESTFLAGS="-count=1"
+	@$(MAKE) -j4 --output-sync=target build vuln tidy-check mod-verify test-all TESTFLAGS="-count=1"
 
 ##@ Release
 
